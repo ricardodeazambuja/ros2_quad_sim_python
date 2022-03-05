@@ -1,0 +1,6 @@
+[submodule "src/rclpy_param_helper"]
+	path = src/rclpy_param_helper
+	url = https://github.com/ricardodeazambuja/rclpy_param_helper.git
+[submodule "src/quad_sim_python_msgs"]
+	path = src/quad_sim_python_msgs
+	url = https://github.com/ricardodeazambuja/quad_sim_python_msgs.git

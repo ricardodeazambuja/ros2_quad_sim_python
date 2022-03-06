@@ -7,7 +7,7 @@ def generate_launch_description():
     ld = launch.LaunchDescription([
         launch.actions.DeclareLaunchArgument(
             name='init_pose',
-            default_value=[0,0,2,0,0,0],
+            default_value="[0,0,2,0,0,0]",
             description='Initial pose'
         ),
         launch.actions.DeclareLaunchArgument(

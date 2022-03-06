@@ -1,4 +1,4 @@
-# quad_sim_python
+# ros2_quad_sim_python
 ROS2 packages to simulate (and control) a quadcopter. These packages were created to be used with a flying sensor in CARLA. The flying sensor is a `bodiless` actor that only has sensors and it will go through the scenario without collisions. The `flying_sensor` definition can be found [here](https://github.com/ricardodeazambuja/carla-ros/blob/master/carla_spawn_objects/config/flying_sensor.json).
 
 

@@ -1,3 +1,4 @@
+import time
 
 import sys, os
 curr_path = os.getcwd()
@@ -108,8 +109,16 @@ class QuadCtrl(Node):
         # Update ROS2 parameters
         Dict2ROS2Params(self, ctrl_params) # the controller needs to read some parameters from here
 
-        quad_params_list = ['mB', 'g', 'IB', 'maxThr', 'minThr', 'orient', 'mixerFMinv', 'minWmotor', 'maxWmotor', 'target_frame']
-        self.quad_params = ROS2Params2Dict(self, 'quadsim', quad_params_list)
+        parameters_received = False
+        while not parameters_received:
+            quad_params_list = ['mB', 'g', 'IB', 'maxThr', 'minThr', 'orient', 'mixerFMinv', 'minWmotor', 'maxWmotor', 'target_frame']
+            self.quad_params = ROS2Params2Dict(self, 'quadsim', quad_params_list)
+            if quad_params_list == list(self.quad_params.keys()):
+                parameters_received = True
+            else:
+                self.get_logger().warn(f'Waiting for quadsim parameters!')
+                time.sleep(1)
+        
 
         self.receive_control_sp = self.create_subscription(
             QuadControlSetPoint,

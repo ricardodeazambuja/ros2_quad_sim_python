@@ -9,10 +9,14 @@ setup(
     version='0.0.1',
     packages=find_packages(),
     data_files=[
-        ('share/ament_index/resource_index/packages',
+        ('share/ament_index/resource_index/packages', 
             ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name), glob('launch/*.launch.py'))
+        ('share/' + package_name, 
+            ['package.xml']),
+        ('share/' + package_name + '/cfg', 
+            ['cfg/rviz_flying_sensor.rviz']),
+        ('share/' + package_name, 
+            glob('launch/*.launch.py'))
     ],
     install_requires=['setuptools', 'scipy>=1.6', 'numpy>=1.20', 'quad_sim_python'],
     zip_safe=True,

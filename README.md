@@ -58,3 +58,4 @@ Don't forget to run `colcon build --symlink-install` if you change anything that
 * Add an example publishing setpoints to quadctrl, reading the current state, etc.
 * Add an example using the wind.
 * Create a message for the potential field and update ros_quad_ctrl to subscribe to a topic receiving that message.
+* Make the topic where the simulator publishes the poses a parameter so it can be easily used with other things than CARLA.

@@ -45,7 +45,7 @@ $ docker exec -t ros2-8589d9bd2d bash -i -c "ros2 topic list"
 ```
 Docker exec is a *oneway* thing, so I don't recommend using it with anything that needs to catch the `ctrl+c` (SIGINT) to gracefully stop (like `carla_spawn_objects.launch.py` needs to remove the actors it created from the CARLA server), it will not work.
 
-Another useful command to use (considering your container's name is `ros2-8589d9bd2d`) is:
+Another useful command to use (considering your container's name is `ros2-bb93a782c4`) is:
 ```
 $ docker exec -t ros2-bb93a782c4 bash -i -c "ros2 run plotjuggler plotjuggler"
 ```

@@ -39,6 +39,18 @@ You can launch as many containers as you need. It's easier than using `docker ex
 $ ros2 launch ros2_quad_sim_python launch_everything.launch.py
 ```
 
+If you still want to use the same container to save some memory, you need to take note of the containers name (it will be `ros2-` plus five random characters). Here is how to check the topics without launching a new container (the container's name in this caase is `ros2-8589d9bd2d`):
+```
+$ docker exec -t ros2-8589d9bd2d bash -i -c "ros2 topic list"
+```
+Docker exec is a *oneway* thing, so I don't recommend using it with anything that needs to catch the `ctrl+c` (SIGINT) to gracefully stop (like `carla_spawn_objects.launch.py` needs to remove the actors it created from the CARLA server), it will not work.
+
+Another useful command to use (considering your container's name is `ros2-8589d9bd2d`) is:
+```
+$ docker exec -t ros2-bb93a782c4 bash -i -c "ros2 run plotjuggler plotjuggler"
+```
+
+
 These are the commands to launch things individually:
 ```
 $ ros2 launch carla_ros_bridge carla_ros_bridge.launch.py passive:=False town:=Town01
@@ -48,7 +60,7 @@ $ ros2 run quad_sim_python quadctrl --ros-args -p Px:=2 -p Py:=2 -p Pz:=1
 $ ros2 run rviz2 rviz2 --ros-args -d ~/carla-ros/install/ros2_quad_sim_python/share/ros2_quad_sim_python/cfg/rviz_flying_sensor.rviz
 ```
 
-Publish a new setpoint by using `$ros2 topic pub /quadctrl/flying_sensor/ctrl_sp quad_sim_python_msgs/msg/QuadControlSetPoint  "h` and hitting the `tab` twice so it will fill the rest of the message. Don't forget to remote the `-` the autocomplete insists adding at the end.
+Publish a new setpoint by using `$ros2 topic pub /quadctrl/flying_sensor/ctrl_sp quad_sim_python_msgs/msg/QuadControlSetPoint  "h` and hitting the `tab` twice so it will fill the rest of the message. Don't forget to remove the `-` the autocomplete insists adding at the end.
 
 ## Making changes
 Don't forget to run `colcon build --symlink-install` if you change anything that is not just a Python script.
@@ -58,4 +70,4 @@ Don't forget to run `colcon build --symlink-install` if you change anything that
 * Add an example publishing setpoints to quadctrl, reading the current state, etc.
 * Add an example using the wind.
 * Create a message for the potential field and update ros_quad_ctrl to subscribe to a topic receiving that message.
-* Make the topic where the simulator publishes the poses a parameter so it can be easily used with other things than CARLA.
+* Make the topic where the simulator publishes the poses a parameter so it can be easily changed allowing it to be used with other things than CARLA.

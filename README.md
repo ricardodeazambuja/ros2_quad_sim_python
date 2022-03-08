@@ -24,7 +24,7 @@ All the instructions can be found in the Dockerfile:
 ### Get the script to launch ROS2
 * https://github.com/ricardodeazambuja/ros2-playground/blob/main/launch_ros2_desktop.sh
 
-Don't forget to make the script executable to make life easier (`$ chmod +x launch_ros2_desktop.sh`).
+Don't forget to turn the script executable to make life easier (`$ chmod +x launch_ros2_desktop.sh`).
 
 ### Launch the container
 If you don't want to create your own docker image, you can spawn containers using this command:

@@ -10,7 +10,7 @@ from copy import copy
 import numpy as np
 from numpy.linalg import norm
 
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Twist
 from quad_sim_python_msgs.msg import QuadMotors, QuadState, QuadControlSetPoint
 
 import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
@@ -126,6 +126,12 @@ class QuadCtrl(Node):
             self.receive_control_sp_cb,
             1)
 
+        self.receive_control_twist = self.create_subscription(
+            Twist,
+            f"/quadctrl/{self.quad_params['target_frame']}/ctrl_twist_sp",
+            self.receive_control_twist_cb,
+            1)
+
         self.receive_quadstate = self.create_subscription(
             QuadState,
             f"/quadsim/{self.quad_params['target_frame']}/state",
@@ -150,6 +156,25 @@ class QuadCtrl(Node):
 
         self.get_logger().info(f'Received control setpoint: {self.curr_sp}')
 
+
+    def receive_control_twist_cb(self, twist):
+        if not self.started:
+            self.start_ctrl()
+            self.started = True
+            self.get_logger().info(f'Controller started!')
+
+        with self.ctrl_sp_lock:
+            now = rclpy.time.Time().to_msg()
+            self.curr_sp.header.stamp = now
+            self.curr_sp.ctrltype = "xyz_vel"
+            self.curr_sp.pos = [0,0,0]
+            self.curr_sp.vel = [twist.linear.x, twist.linear.y, twist.linear.z]
+            self.curr_sp.acc = [0,0,0]
+            self.curr_sp.thr = [0,0,0]
+            self.curr_sp.yaw = 0
+            self.curr_sp.yawrate = twist.angular.z
+
+        self.get_logger().info(f'Received twist setpoint: {self.curr_sp}')
 
 
     def receive_quadstate_cb(self, state_msg):

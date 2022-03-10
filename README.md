@@ -60,7 +60,14 @@ $ ros2 run quad_sim_python quadctrl --ros-args -p Px:=2 -p Py:=2 -p Pz:=1
 $ ros2 run rviz2 rviz2 --ros-args -d ~/carla-ros/install/ros2_quad_sim_python/share/ros2_quad_sim_python/cfg/rviz_flying_sensor.rviz
 ```
 
-Publish a new setpoint by using `$ros2 topic pub /quadctrl/flying_sensor/ctrl_sp quad_sim_python_msgs/msg/QuadControlSetPoint  "h` and hitting the `tab` twice so it will fill the rest of the message. Don't forget to remove the `-` the autocomplete insists adding at the end.
+Publish a new setpoint by using `$ros2 topic pub /quadctrl/flying_sensor/ctrl_sp quad_sim_python_msgs/msg/QuadControlSetPoint  "h` and hitting the `tab` twice so it will fill the rest of the message. Don't forget to remove the `-` the autocomplete insists adding at the end.   
+Or publish a new twist setpoint by using `ros2 topic pub /quadctrl/flying_sensor/ctrl_twist_sp geometry_msgs/msg/Twist "l` and following the same hints from above.
+
+Another option is to control the simulated quadcopter using the keyboard with the `teleop_twist_keyboard` package (where `flying_sensor` is the default name):
+```
+$ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r teleop_twist_keyboard:cmd_vel:=/quadctrl/flying_sensor/ctrl_twist_sp
+```
+
 
 ## Making changes
 Don't forget to run `colcon build --symlink-install` if you change anything that is not just a Python script.

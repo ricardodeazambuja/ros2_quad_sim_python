@@ -107,7 +107,7 @@ class QuadSim(Node):
         if "init_pose" not in quad_params:
             # Look up for the transformation between target_frame and map_frame frames
             try:
-                now = rclpy.time.Time()
+                now = rclpy.clock.Clock().now()
                 trans = self.tf_buffer.lookup_transform(
                     quad_params["map_frame"],
                     quad_params["target_frame"],
@@ -227,7 +227,7 @@ class QuadSim(Node):
         state_msg = QuadState()
         imu_msg = Imu()
         with self.sim_pub_lock:
-            now = rclpy.time.Time().to_msg()
+            now = rclpy.clock.Clock().now().to_msg()
             state_msg.header.stamp = now
             state_msg.t = self.t
             state_msg.pos = self.curr_state[0:3][:]

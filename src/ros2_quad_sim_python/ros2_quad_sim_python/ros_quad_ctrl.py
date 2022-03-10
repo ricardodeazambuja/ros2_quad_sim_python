@@ -167,11 +167,11 @@ class QuadCtrl(Node):
             now = rclpy.time.Time().to_msg()
             self.curr_sp.header.stamp = now
             self.curr_sp.ctrltype = "xyz_vel"
-            self.curr_sp.pos = [0,0,0]
+            self.curr_sp.pos = [0.0,0.0,0.0]
             self.curr_sp.vel = [twist.linear.x, twist.linear.y, twist.linear.z]
-            self.curr_sp.acc = [0,0,0]
-            self.curr_sp.thr = [0,0,0]
-            self.curr_sp.yaw = 0
+            self.curr_sp.acc = [0.0,0.0,0.0]
+            self.curr_sp.thr = [0.0,0.0,0.0]
+            self.curr_sp.yaw = 0.0
             self.curr_sp.yawrate = twist.angular.z
 
         self.get_logger().info(f'Received twist setpoint: {self.curr_sp}')

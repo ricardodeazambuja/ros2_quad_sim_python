@@ -164,14 +164,14 @@ class QuadCtrl(Node):
             self.get_logger().info(f'Controller started!')
 
         with self.ctrl_sp_lock:
-            now = rclpy.time.Time().to_msg()
+            now = rclpy.clock.Clock().now().to_msg()
             self.curr_sp.header.stamp = now
             self.curr_sp.ctrltype = "xyz_vel"
             self.curr_sp.pos = [0.0,0.0,0.0]
             self.curr_sp.vel = [twist.linear.x, twist.linear.y, twist.linear.z]
             self.curr_sp.acc = [0.0,0.0,0.0]
             self.curr_sp.thr = [0.0,0.0,0.0]
-            self.curr_sp.yaw = 0.0
+            self.curr_sp.yawtype = "twist"
             self.curr_sp.yawrate = twist.angular.z
 
         self.get_logger().info(f'Received twist setpoint: {self.curr_sp}')
@@ -179,8 +179,9 @@ class QuadCtrl(Node):
 
     def receive_quadstate_cb(self, state_msg):
         self.quad_state = True
-        if self.t != None:
+        if self.t == None:
             self.prev_t = self.t = state_msg.t
+            return
         else:
             self.prev_t = self.t
             self.t = state_msg.t
@@ -188,6 +189,8 @@ class QuadCtrl(Node):
 
         if self.started:
             if self.ctrl_sp_lock.acquire(blocking=False):
+                if self.curr_sp.yawtype == "twist":
+                    self.curr_sp.yaw += (self.t-self.prev_t)*self.curr_sp.yawrate
                 self.prev_sp = self.curr_sp
                 self.ctrl_sp_lock.release()
 
@@ -201,7 +204,7 @@ class QuadCtrl(Node):
 
             w_cmd = self.ctrl.getMotorSpeeds()
             motor_msg = QuadMotors()
-            motor_msg.header.stamp = rclpy.time.Time().to_msg()
+            motor_msg.header.stamp = rclpy.clock.Clock().now().to_msg()
             motor_msg.m1 = int(w_cmd[0])
             motor_msg.m2 = int(w_cmd[1])
             motor_msg.m3 = int(w_cmd[2])

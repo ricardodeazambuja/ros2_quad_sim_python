@@ -50,6 +50,11 @@ Another useful command to use (considering your container's name is `ros2-bb93a7
 $ docker exec -t ros2-bb93a782c4 bash -i -c "ros2 run plotjuggler plotjuggler"
 ```
 
+If you just want to start a new terminal using the same container (useful when making changes to that container only during debugging):
+```
+$ docker exec -it ros2-bb93a782c4 bash
+```
+
 
 These are the commands to launch things individually:
 ```

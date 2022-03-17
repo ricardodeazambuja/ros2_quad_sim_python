@@ -73,6 +73,8 @@ Another option is to control the simulated quadcopter using the keyboard with th
 $ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r teleop_twist_keyboard:cmd_vel:=/quadctrl/flying_sensor/ctrl_twist_sp
 ```
 
+## Time synchronisation
+Now the `quadsim` node is calculating the difference between the machine time and the time CARLA ros-bridge publishes. This time difference is available as the parameter `carla_time_diff_ns`. The node `quadctrl` reads this parameter from `quadsim`. All messages are synchronised with CARLA ros-bridge, but the assumption is the hosts have their system times synchronised.
 
 ## Making changes
 Don't forget to run `colcon build --symlink-install` if you change anything that is not just a Python script.
@@ -83,3 +85,4 @@ Don't forget to run `colcon build --symlink-install` if you change anything that
 * Add an example using the wind.
 * Create a message for the potential field and update ros_quad_ctrl to subscribe to a topic receiving that message.
 * Make the topic where the simulator publishes the poses a parameter so it can be easily changed allowing it to be used with other things than CARLA.
+* Consider a better way to [synchronise time between the ROS2 nodes](https://design.ros2.org/articles/clock_and_time.html).

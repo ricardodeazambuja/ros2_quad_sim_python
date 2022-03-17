@@ -8,12 +8,14 @@ from threading import Lock
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from carla_msgs.msg import CarlaStatus
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Pose
 from quad_sim_python_msgs.msg import QuadMotors, QuadWind, QuadState
 
 import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
 from rclpy.node import Node
+from rclpy.time import Time
 
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -71,19 +73,6 @@ class QuadSim(Node):
                          allow_undeclared_parameters=True, # necessary for using set_parameters
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
 
-        # Read ROS2 parameters the user may have set 
-        # E.g. (https://docs.ros.org/en/foxy/How-To-Guides/Node-arguments.html):
-        # --ros-args -p init_pose:=[0,0,0,0,0,0])
-        # --ros-args --params-file params.yaml
-        read_params = ROS2Params2Dict(self, 'quadsim', list(quad_params.keys()) + ["init_pose"])
-        for k,v in read_params.items():
-            # Update local parameters
-            quad_params[k] = v
-        
-        # Update ROS2 parameters
-        Dict2ROS2Params(self, quad_params) # the controller needs to read some parameters from here
-
-
         self.w_cmd_lock = Lock()
         self.wind_lock = Lock()
         self.sim_pub_lock = Lock()
@@ -95,19 +84,51 @@ class QuadSim(Node):
         self.prev_wind = [0,0,0]
 
 
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.get_carlastatus = self.create_subscription(
+            CarlaStatus,
+            '/carla/status',
+            self.get_carlastatus_cb,
+            1)
+
         
+    def get_carlastatus_cb(self, msg):
+        s = msg.header.stamp.sec
+        ns = msg.header.stamp.nanosec
+        frame = msg.frame
+        delta_t = msg.fixed_delta_seconds
+        carla_time = frame*delta_t*1E9
+        system_time = s*1E9 + ns
+        self.carla_time_diff_ns = system_time-carla_time
+        self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
+
+        # Read ROS2 parameters the user may have set 
+        # E.g. (https://docs.ros.org/en/foxy/How-To-Guides/Node-arguments.html):
+        # --ros-args -p init_pose:=[0,0,0,0,0,0])
+        # --ros-args --params-file params.yaml
+        read_params = ROS2Params2Dict(self, 'quadsim', list(quad_params.keys()) + ["init_pose"])
+        for k,v in read_params.items():
+            # Update local parameters
+            quad_params[k] = v
+        
+        quad_params['carla_time_diff_ns'] = self.carla_time_diff_ns
+        
+        # Update ROS2 parameters
+        Dict2ROS2Params(self, quad_params) # the controller needs to read some parameters from here
+
         # Timer for the tf
         # I couldn't find a way to receive it without using a timer 
         # to allow me to call lookup_transform after rclpy.spin(quad_node)
+        self.tf_trials = 5
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
         self.tf_timer = self.create_timer(1.0, self.on_tf_timer)
+
 
     def on_tf_timer(self):
         if "init_pose" not in quad_params:
             # Look up for the transformation between target_frame and map_frame frames
             try:
-                now = rclpy.clock.Clock().now()
+                now = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns))
                 trans = self.tf_buffer.lookup_transform(
                     quad_params["map_frame"],
                     quad_params["target_frame"],
@@ -119,9 +140,9 @@ class QuadSim(Node):
                             trans.transform.translation.z]
 
                 init_quat = [trans.transform.rotation.x,
-                             trans.transform.rotation.y,
-                             trans.transform.rotation.z,
-                             trans.transform.rotation.w]
+                            trans.transform.rotation.y,
+                            trans.transform.rotation.z,
+                            trans.transform.rotation.w]
 
                 init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
                 
@@ -131,6 +152,9 @@ class QuadSim(Node):
 
             except TransformException as ex:
                 self.get_logger().error(f'Could not transform {quad_params["map_frame"]} to {quad_params["target_frame"]}: {ex}')
+                self.tf_trials -= 1
+
+            if self.tf_trials <= 0:
                 quad_params["init_pose"] = [0,0,0,0,0,0]
                 self.get_logger().error(f'init_pose not available... using {quad_params["init_pose"]}')
                 # Update ROS2 parameters
@@ -146,7 +170,7 @@ class QuadSim(Node):
         init_pose = np.array(params['init_pose']) # x0, y0, z0, phi0, theta0, psi0
         init_twist = np.array([0,0,0,0,0,0]) # xdot, ydot, zdot, p, q, r
         init_states = np.hstack((init_pose,init_twist))
-        self.t = 0
+        self.t = (rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns)/1E9
         self.Ts = params['Ts']
         self.quad = Quadcopter(self.t, init_states, params=params.copy(), orient=params['orient'])
         self.w_cmd = [self.quad.params['w_hover']]*4
@@ -227,7 +251,7 @@ class QuadSim(Node):
         state_msg = QuadState()
         imu_msg = Imu()
         with self.sim_pub_lock:
-            now = rclpy.clock.Clock().now().to_msg()
+            now = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns)).to_msg()
             state_msg.header.stamp = now
             state_msg.t = self.t
             state_msg.pos = self.curr_state[0:3][:]

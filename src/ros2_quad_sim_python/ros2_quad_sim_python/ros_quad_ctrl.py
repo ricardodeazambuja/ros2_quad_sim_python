@@ -85,8 +85,8 @@ class QuadCtrl(Node):
 
     def __init__(self):
         super().__init__('quadctrl', 
-                         allow_undeclared_parameters=True, 
-                         automatically_declare_parameters_from_overrides=True)
+                         allow_undeclared_parameters=True, # necessary for using set_parameters
+                         automatically_declare_parameters_from_overrides=True) # allows command line parameters
 
         self.started = False
         self.quad_state = False

@@ -76,6 +76,10 @@ $ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r teleop_twis
 ## Time synchronisation
 Now the `quadsim` node is calculating the difference between the machine time and the time CARLA ros-bridge publishes. This time difference is available as the parameter `carla_time_diff_ns`. The node `quadctrl` reads this parameter from `quadsim`. All messages are synchronised with CARLA ros-bridge, but the assumption is the hosts have their system times synchronised.
 
+## Training Episode Generator
+* [spawn_episode.py](https://github.com/ricardodeazambuja/ros2_quad_sim_python/blob/main/examples/spawn_episode.py): randomly choose a spawn point from the map and populate the area around with vehicles and walkers.
+
+
 ## Making changes
 Don't forget to run `colcon build --symlink-install` if you change anything that is not just a Python script.
 

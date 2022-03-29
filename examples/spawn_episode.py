@@ -14,6 +14,10 @@ from carla_waypoint_types.srv import GetWaypoint
 NUMBER_OF_CARS = 10
 NUMBER_OF_WALKERS = 30
 MAX_DIST_FROM_CENTER = 50
+# DIST = {'circle':MAX_DIST_FROM_CENTER}
+# DIST = {'square':MAX_DIST_FROM_CENTER}
+DIST = {'rect':(MAX_DIST_FROM_CENTER, MAX_DIST_FROM_CENTER/2)}
+MAX_TRIALS = 50
 
 class SpawnEpisode(Node):
     def __init__(self):
@@ -21,8 +25,8 @@ class SpawnEpisode(Node):
                          allow_undeclared_parameters=True, # necessary for using set_parameters
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
 
-        self.spawned_vehicles = []
-        self.spawned_walkers = []
+        self.spawned_vehicles = {}
+        self.spawned_walkers = {}
 
 
         # Get spawn points available for cars in the current map
@@ -51,37 +55,48 @@ class SpawnEpisode(Node):
 
         # Spawn vehicles
         i = 0
-        while i < NUMBER_OF_CARS:
-            x,y = self.randXY(rs, MAX_DIST_FROM_CENTER)
+        t = 0
+        while i < NUMBER_OF_CARS and t < MAX_TRIALS:
+            x,y = self.randXY(rs, dist=DIST)
             pose = self.get_waypoint(central_location[0]+x, 
                                      central_location[1]+y, 
                                      central_location[2]).waypoint.pose
             res_id = self.spawn_actor(rs.choice(vehicles), f"vehicle_{i:03d}", pose)
+            t += 1
             if res_id != -1:
-                self.spawned_vehicles.append(res_id)
+                self.spawned_vehicles[res_id] = pose
                 i += 1
                 
 
         # Spawn walkers
         i = 0
-        while i < NUMBER_OF_WALKERS:
-            x,y = self.randXY(rs, MAX_DIST_FROM_CENTER)
+        t = 0
+        while i < NUMBER_OF_WALKERS and t < MAX_TRIALS:
+            x,y = self.randXY(rs, dist=DIST)
             pose = Pose()
             pose.position.x = float(central_location[0]+x)
             pose.position.y = float(central_location[1]+y)
             pose.position.z = float(central_location[2])
             res_id = self.spawn_actor(rs.choice(walkers), f"walker_{i:03d}", pose)
+            t += 1
             if res_id != -1:
-                self.spawned_walkers.append(res_id)
+                self.spawned_walkers[res_id] = pose
                 i += 1
 
     
     @staticmethod
-    def randXY(randstate, maxlenght):
-        radius = np.sqrt(randstate.uniform(0, maxlenght))
-        angle = np.pi * randstate.uniform(0, 2)
-        return radius * np.cos(angle), radius * np.sin(angle)
-
+    def randXY(randstate, dist={'circle': MAX_DIST_FROM_CENTER}):
+        if 'circle' in dist:
+            maxlenght = dist['circle']
+            radius = np.sqrt(randstate.uniform(0, maxlenght))
+            angle = np.pi * randstate.uniform(0, 2)
+            return radius * np.cos(angle), radius * np.sin(angle)
+        elif 'square' in dist:
+            maxlenght = dist['square']
+            return randstate.uniform(-maxlenght/2, maxlenght/2, 2)
+        elif 'rect' in dist:
+            max_x, max_y = dist['rect']
+            return randstate.uniform(-max_x/2, max_x/2), randstate.uniform(-max_y/2, max_y/2)
     
     def get_waypoint(self, x, y, z):
         request = GetWaypoint.Request()
@@ -113,7 +128,7 @@ class SpawnEpisode(Node):
 
 
     def destroy_actors(self):
-        spawned_actors = self.spawned_vehicles + self.spawned_walkers
+        spawned_actors = list(self.spawned_vehicles.keys()) + list(self.spawned_walkers.keys())
         for i, actor_id in enumerate(spawned_actors):
             request = DestroyObject.Request()
             request.id = actor_id

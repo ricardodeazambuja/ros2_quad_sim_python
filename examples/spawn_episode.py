@@ -14,13 +14,18 @@ from carla_waypoint_types.srv import GetWaypoint
 NUMBER_OF_CARS = 10
 NUMBER_OF_WALKERS = 30
 MAX_DIST_FROM_CENTER = 50
-# DIST = {'circle':MAX_DIST_FROM_CENTER}
-# DIST = {'square':MAX_DIST_FROM_CENTER}
-DIST = {'rect':(MAX_DIST_FROM_CENTER, MAX_DIST_FROM_CENTER/2)}
+# DIST = {'circle': MAX_DIST_FROM_CENTER}
+# DIST = {'donut':  MAX_DIST_FROM_CENTER/2,MAX_DIST_FROM_CENTER}
+# DIST = {'square': MAX_DIST_FROM_CENTER}
+DIST = {'rect':  (MAX_DIST_FROM_CENTER, MAX_DIST_FROM_CENTER/2)}
 MAX_TRIALS = 50
 
+DIST_BETWEEN_CLUSTERS = 80
+NUMBER_OF_CLUSTERS = 10
+
+
 class SpawnEpisode(Node):
-    def __init__(self):
+    def __init__(self, central_pos = None):
         super().__init__('spawn_episode', 
                          allow_undeclared_parameters=True, # necessary for using set_parameters
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
@@ -35,15 +40,22 @@ class SpawnEpisode(Node):
         csp_locations = np.asarray([csp.location_xyz for csp in response.spawn_points])
         csp_rotations = np.asarray([csp.rotation_rpy for csp in response.spawn_points])
 
-        # Randomly select one of the spawn points
         rs = np.random.RandomState()
-        rand_spawn_point = csp_locations[rs.choice(csp_locations.shape[0])]
+        if not central_pos:
+            # Randomly select one of the spawn points
+            spawn_point = csp_locations[rs.choice(csp_locations.shape[0])]
+        else:
+            central_pos = np.array(central_pos)
+            assert central_pos.shape[0] == 3
+
+            spawn_point = csp_locations[np.argsort(((csp_locations - central_pos)**2).sum())[0]]
 
         # Calculates the distances between the selected spawn point to all others
-        dists = np.linalg.norm(csp_locations - rand_spawn_point, ord=2, axis=1)
+        dists = np.linalg.norm(csp_locations - spawn_point, ord=2, axis=1)
         
         # Sort the spawn points according to the distance to the selected one
         sorted_indices = np.argsort(dists)
+        sorted_dists = dists[sorted_indices]
         sorted_locations = csp_locations[sorted_indices]
 
         # Get the blueprints available in the current map
@@ -51,37 +63,44 @@ class SpawnEpisode(Node):
         vehicles = [v for v in response.blueprints if "vehicle" in v]
         walkers = [w for w in response.blueprints if "walker" in w]
 
-        central_location = sorted_locations[0]
+        locations = [sorted_locations[0]]
 
-        # Spawn vehicles
-        i = 0
-        t = 0
-        while i < NUMBER_OF_CARS and t < MAX_TRIALS:
-            x,y = self.randXY(rs, dist=DIST)
-            pose = self.get_waypoint(central_location[0]+x, 
-                                     central_location[1]+y, 
-                                     central_location[2]).waypoint.pose
-            res_id = self.spawn_actor(rs.choice(vehicles), f"vehicle_{i:03d}", pose)
-            t += 1
-            if res_id != -1:
-                self.spawned_vehicles[res_id] = pose
-                i += 1
-                
+        dist_from_first = 0
+        for c in range(NUMBER_OF_CLUSTERS):
+            dist_from_first += DIST_BETWEEN_CLUSTERS
+            new_loc = sorted_locations[np.argsort(abs(sorted_dists-dist_from_first))[0]]
+            locations.append(new_loc)
 
-        # Spawn walkers
-        i = 0
-        t = 0
-        while i < NUMBER_OF_WALKERS and t < MAX_TRIALS:
-            x,y = self.randXY(rs, dist=DIST)
-            pose = Pose()
-            pose.position.x = float(central_location[0]+x)
-            pose.position.y = float(central_location[1]+y)
-            pose.position.z = float(central_location[2])
-            res_id = self.spawn_actor(rs.choice(walkers), f"walker_{i:03d}", pose)
-            t += 1
-            if res_id != -1:
-                self.spawned_walkers[res_id] = pose
-                i += 1
+        for central_location in locations:
+            # Spawn vehicles
+            i = 0
+            t = 0
+            while i < NUMBER_OF_CARS and t < MAX_TRIALS:
+                x,y = self.randXY(rs, dist=DIST)
+                pose = self.get_waypoint(central_location[0]+x, 
+                                        central_location[1]+y, 
+                                        central_location[2]).waypoint.pose
+                res_id = self.spawn_actor(rs.choice(vehicles), f"vehicle_{i:03d}", pose)
+                t += 1
+                if res_id != -1:
+                    self.spawned_vehicles[res_id] = pose
+                    i += 1
+                    
+
+            # Spawn walkers
+            i = 0
+            t = 0
+            while i < NUMBER_OF_WALKERS and t < MAX_TRIALS:
+                x,y = self.randXY(rs, dist=DIST)
+                pose = Pose()
+                pose.position.x = float(central_location[0]+x)
+                pose.position.y = float(central_location[1]+y)
+                pose.position.z = float(central_location[2])
+                res_id = self.spawn_actor(rs.choice(walkers), f"walker_{i:03d}", pose)
+                t += 1
+                if res_id != -1:
+                    self.spawned_walkers[res_id] = pose
+                    i += 1
 
     
     @staticmethod
@@ -89,6 +108,11 @@ class SpawnEpisode(Node):
         if 'circle' in dist:
             maxlenght = dist['circle']
             radius = np.sqrt(randstate.uniform(0, maxlenght))
+            angle = np.pi * randstate.uniform(0, 2)
+            return radius * np.cos(angle), radius * np.sin(angle)
+        elif 'donut' in dist:
+            minlength, maxlenght = dist['donut']
+            radius = np.sqrt(randstate.uniform(minlength, maxlenght))
             angle = np.pi * randstate.uniform(0, 2)
             return radius * np.cos(angle), radius * np.sin(angle)
         elif 'square' in dist:
@@ -163,7 +187,7 @@ class SpawnEpisode(Node):
 def main():
     print("Starting SpawnEpisode...")
     rclpy.init()
-    spawn_episode = SpawnEpisode()
+    spawn_episode = SpawnEpisode(central_pos=(0,0,2.4))
     try:
         rclpy.spin(spawn_episode)
     except KeyboardInterrupt:

@@ -1,4 +1,3 @@
-from webbrowser import get
 import numpy as np
 
 import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html

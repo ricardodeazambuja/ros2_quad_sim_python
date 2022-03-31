@@ -15,7 +15,7 @@ from quad_sim_python_msgs.msg import QuadMotors, QuadWind, QuadState
 
 import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
 from rclpy.node import Node
-from rclpy.time import Time
+from rclpy.time import Time, Duration
 
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -73,6 +73,7 @@ class QuadSim(Node):
                          allow_undeclared_parameters=True, # necessary for using set_parameters
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
 
+        self.t = None
         self.w_cmd_lock = Lock()
         self.wind_lock = Lock()
         self.sim_pub_lock = Lock()
@@ -92,13 +93,6 @@ class QuadSim(Node):
 
         
     def get_carlastatus_cb(self, msg):
-        s = msg.header.stamp.sec
-        ns = msg.header.stamp.nanosec
-        frame = msg.frame
-        delta_t = msg.fixed_delta_seconds
-        carla_time = frame*delta_t*1E9
-        system_time = s*1E9 + ns
-        self.carla_time_diff_ns = system_time-carla_time
         self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
 
         # Read ROS2 parameters the user may have set 
@@ -110,8 +104,6 @@ class QuadSim(Node):
             # Update local parameters
             quad_params[k] = v
         
-        quad_params['carla_time_diff_ns'] = self.carla_time_diff_ns
-        
         # Update ROS2 parameters
         Dict2ROS2Params(self, quad_params) # the controller needs to read some parameters from here
 
@@ -121,56 +113,65 @@ class QuadSim(Node):
         self.tf_trials = 5
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.tf_timer = self.create_timer(1.0, self.on_tf_timer)
+        self.tf_timer = self.create_timer(1.0, self.on_tf_init_timer)
 
 
-    def on_tf_timer(self):
+    def get_tf(self, t=0.0, timeout=1.0):
+        try:
+            now = Time(nanoseconds=t)
+            trans = self.tf_buffer.lookup_transform(
+                quad_params["map_frame"],
+                quad_params["target_frame"],
+                now,
+                timeout=Duration(seconds=timeout))
+
+            self.get_logger().info(f'TF received {trans}')
+            curr_pos = [trans.transform.translation.x, 
+                        trans.transform.translation.y, 
+                        trans.transform.translation.z]
+
+            curr_quat = [trans.transform.rotation.x,
+                        trans.transform.rotation.y,
+                        trans.transform.rotation.z,
+                        trans.transform.rotation.w]
+
+            s = trans.header.stamp.sec
+            ns = trans.header.stamp.nanosec
+            return (s + ns/1E9), curr_pos, curr_quat
+
+        except TransformException as ex:
+            self.get_logger().error(f'Could not transform {quad_params["map_frame"]} to {quad_params["target_frame"]}: {ex}')
+
+
+    def on_tf_init_timer(self):
+        res = self.get_tf()
+        if res:
+            self.t, init_pos, init_quat = res
+            init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
+        else:
+            return
+
         if "init_pose" not in quad_params:
-            # Look up for the transformation between target_frame and map_frame frames
-            try:
-                now = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns))
-                trans = self.tf_buffer.lookup_transform(
-                    quad_params["map_frame"],
-                    quad_params["target_frame"],
-                    now)
-
-                self.get_logger().info(f'TF received {trans}')
-                init_pos = [trans.transform.translation.x, 
-                            trans.transform.translation.y, 
-                            trans.transform.translation.z]
-
-                init_quat = [trans.transform.rotation.x,
-                            trans.transform.rotation.y,
-                            trans.transform.rotation.z,
-                            trans.transform.rotation.w]
-
-                init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
-                
                 quad_params["init_pose"] = np.concatenate((init_pos,init_rpy))
                 # Update ROS2 parameters
                 Dict2ROS2Params(self, {"init_pose": quad_params["init_pose"]}) # the controller needs to read some parameters from here
-
-            except TransformException as ex:
-                self.get_logger().error(f'Could not transform {quad_params["map_frame"]} to {quad_params["target_frame"]}: {ex}')
-                self.tf_trials -= 1
-
-            if self.tf_trials <= 0:
-                quad_params["init_pose"] = [0,0,0,0,0,0]
-                self.get_logger().error(f'init_pose not available... using {quad_params["init_pose"]}')
-                # Update ROS2 parameters
-                Dict2ROS2Params(self, {"init_pose": quad_params["init_pose"]})
         else:
+            self.destroy_timer(self.tf_timer)
             self.start_sim()
+
+    def on_tf_timer(self):
+        res = self.get_tf()
+        if res:
+            if self.sim_pub_lock.acquire(blocking=False):
+                self.res = res
+                self.sim_pub_lock.release()
 
 
     def start_sim(self):   
-        self.destroy_timer(self.tf_timer)
-
         params = ROS2Params2Dict(self, 'quadsim', quad_params.keys())
         init_pose = np.array(params['init_pose']) # x0, y0, z0, phi0, theta0, psi0
         init_twist = np.array([0,0,0,0,0,0]) # xdot, ydot, zdot, p, q, r
         init_states = np.hstack((init_pose,init_twist))
-        self.t = (rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns)/1E9
         self.Ts = params['Ts']
         self.quad = Quadcopter(self.t, init_states, params=params.copy(), orient=params['orient'])
         self.w_cmd = [self.quad.params['w_hover']]*4
@@ -180,6 +181,8 @@ class QuadSim(Node):
         self.sim_loop_timer = self.create_timer(self.Ts, self.on_sim_loop)
         self.sim_publish_full_state_timer = self.create_timer(params['Tfs'], self.on_sim_publish_fs)
         self.sim_publish_pose_timer = self.create_timer(params['Tp'], self.on_sim_publish_pose)
+
+        # self.tf_timer = self.create_timer(self.Ts*2, self.on_tf_timer)
 
         self.get_logger().info(f'Simulator started!')
 
@@ -215,26 +218,38 @@ class QuadSim(Node):
         self.get_logger().info(f'Received wind: {self.wind}')
 
     def on_sim_loop(self):
+        res = self.get_tf()
+
+        if res:
+            new_t, curr_pos, curr_quat = res
+            loops = int((new_t - self.t)/self.Ts)
+        else:
+            return
+
         if self.wind_lock.acquire(blocking=False):
             self.prev_wind[:] = self.wind[:]
             self.wind_lock.release()
 
-        with self.w_cmd_lock:
-            self.quad.update(self.t, self.Ts, self.w_cmd, self.prev_wind)
+        for i in range(loops):
+            with self.w_cmd_lock:
+                self.quad.update(self.t, self.Ts, self.w_cmd, self.prev_wind)
 
-        if self.sim_pub_lock.acquire(blocking=False):
-            self.curr_state[0:3] = self.quad.pos[:]
-            self.curr_state[3:7] = self.quad.quat[[1,2,3,0]] # the sim uses w x y z
-            self.curr_state[7:10] = self.quad.euler[:]
-            self.curr_state[10:13] = self.quad.vel[:]
-            self.curr_state[13:16] = self.quad.vel_dot[:]
-            self.curr_state[16:19] = self.quad.omega[:]
-            self.curr_state[19:22] = self.quad.omega_dot[:]
-            self.t += self.Ts
-            self.sim_pub_lock.release()
+            if self.sim_pub_lock.acquire(blocking=False):
+                self.curr_state[0:3] = self.quad.pos[:]
+                self.curr_state[3:7] = self.quad.quat[[1,2,3,0]] # the sim uses w x y z
+                self.curr_state[7:10] = self.quad.euler[:]
+                self.curr_state[10:13] = self.quad.vel[:]
+                self.curr_state[13:16] = self.quad.vel_dot[:]
+                self.curr_state[16:19] = self.quad.omega[:]
+                self.curr_state[19:22] = self.quad.omega_dot[:]
+                self.t += self.Ts
+                self.sim_pub_lock.release()
+
         self.get_logger().info(f'Quad State: {self.curr_state}')
 
     def on_sim_publish_pose(self):
+        if not self.t:
+            return
         pose_msg = Pose()
         with self.sim_pub_lock:
             pose_msg.position.x = float(self.curr_state[0])
@@ -248,10 +263,12 @@ class QuadSim(Node):
         self.quadpos_pub.publish(pose_msg)
 
     def on_sim_publish_fs(self):
+        if not self.t:
+            return
         state_msg = QuadState()
         imu_msg = Imu()
         with self.sim_pub_lock:
-            now = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns)).to_msg()
+            now = Time(nanoseconds=self.t*1E9).to_msg()
             state_msg.header.stamp = now
             state_msg.t = self.t
             state_msg.pos = self.curr_state[0:3][:]

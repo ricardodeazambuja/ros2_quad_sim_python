@@ -17,10 +17,6 @@ import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
 from rclpy.node import Node
 from rclpy.time import Time
 
-from tf2_ros import TransformException
-from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
-
 from rclpy_param_helper import Dict2ROS2Params, ROS2Params2Dict
 
 from quad_sim_python import Controller
@@ -113,7 +109,7 @@ class QuadCtrl(Node):
         parameters_received = False
         while not parameters_received:
             quad_params_list = ['mB', 'g', 'IB', 'maxThr', 'minThr', 'orient', 'mixerFMinv', 'minWmotor', 'maxWmotor', 
-                                'target_frame', 'carla_time_diff_ns']
+                                'target_frame']
             self.quad_params = ROS2Params2Dict(self, 'quadsim', quad_params_list)
             if quad_params_list == list(self.quad_params.keys()):
                 parameters_received = True
@@ -121,7 +117,6 @@ class QuadCtrl(Node):
                 self.get_logger().warn(f'Waiting for quadsim parameters!')
                 time.sleep(1)
         
-        self.carla_time_diff_ns = self.quad_params['carla_time_diff_ns']
 
         self.receive_control_sp = self.create_subscription(
             QuadControlSetPoint,
@@ -167,7 +162,7 @@ class QuadCtrl(Node):
             self.get_logger().info(f'Controller started!')
 
         with self.ctrl_sp_lock:
-            now = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns)).to_msg()
+            now = Time(nanoseconds=self.t*1E9).to_msg()
             self.curr_sp.header.stamp = now
             self.curr_sp.ctrltype = "xyz_vel"
             self.curr_sp.pos = [0.0,0.0,0.0]
@@ -207,7 +202,7 @@ class QuadCtrl(Node):
 
             w_cmd = self.ctrl.getMotorSpeeds()
             motor_msg = QuadMotors()
-            motor_msg.header.stamp = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns)).to_msg()
+            motor_msg.header.stamp = Time(nanoseconds=self.t*1E9).to_msg()
             motor_msg.m1 = int(w_cmd[0])
             motor_msg.m2 = int(w_cmd[1])
             motor_msg.m3 = int(w_cmd[2])

@@ -13,6 +13,18 @@ from sensor_msgs.msg import PointCloud2, PointField
 
 from point_cloud2 import read_points
 
+
+DIST2PEDESTRIANS = 30 # [m]
+DIST2VEHICLES = 30 # [m]
+DIST2OBSTACLES = 2 # [m]
+LANDING_RADIUS_CHECK = 2 # [m]
+
+LANDING_COST_MULT = 1
+FLATNESS_COST_MULT = 1
+PEDESTRIAN_COST_MULT = 1
+VEHICLE_COST_MULT = 1
+COLLISION_COST_MULT = 1
+
 quad_params = {}
 quad_params["map_frame"] = 'map'
 quad_params["target_frame"] = 'flying_sensor'
@@ -56,7 +68,7 @@ class Agent(Node):
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
 
         self.started = False
-        self.carla_server_time = None
+        self.carla_server_time_ns = None
         self.time_lock = Lock()
         self.lidar_lock = Lock()
 
@@ -72,7 +84,7 @@ class Agent(Node):
         s = msg.header.stamp.sec
         ns = msg.header.stamp.nanosec
         with self.time_lock:
-            self.carla_server_time = s*1E9 + ns
+            self.carla_server_time_ns = s*1E9 + ns
 
         self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
 
@@ -83,71 +95,72 @@ class Agent(Node):
             1)
 
     def receive_semantic_lidar_cb(self, msg):
+        s = msg.header.stamp.sec
+        ns = msg.header.stamp.nanosec
+        with self.time_lock:
+            self.carla_server_time_ns = s*1E9 + ns
+
+        # Read semantic lidar
+        recv_data = []
+        for p in read_points(msg):
+            recv_data.append([float(i) for i in p])
+            # x,y,z,cos_angle,idx,tag = p
+        
+        recv_data = np.asanyarray(recv_data)
+        
         try:
-            s = msg.header.stamp.sec
-            ns = msg.header.stamp.nanosec
-            with self.time_lock:
-                self.carla_server_time = s*1E9 + ns
-
-            # Read semantic lidar
-            recv_data = []
-            for p in read_points(msg):
-                recv_data.append([float(i) for i in p])
-                # x,y,z,cos_angle,idx,tag = p
-            
-            recv_data = np.asanyarray(recv_data)
-
             labels = recv_data[:, 5]
-            indices = np.arange(recv_data.shape[0])
+        except IndexError as err:
+            print(err)
+            return
 
-            xy_dists = np.linalg.norm(recv_data[:,:2], ord=2, axis=1)
+        indices = np.arange(recv_data.shape[0])
 
-            z_dists = np.linalg.norm(recv_data[:,2], ord=2)
+        xy_dists = np.linalg.norm(recv_data[:,:2], ord=2, axis=1)
 
-            # These are the points that we care in relation to a collision 
-            # when the quad is moving on the XY plane
-            quad_plane = indices[z_dists <= 1.0] # indices for points within quad z +/-1.0m
+        z_dists = np.linalg.norm(recv_data[:,2], ord=2)
 
-            LANDING_RADIUS = 2
-            landing_pts = indices[(xy_dists < LANDING_RADIUS) & (recv_data[:,2] < 0)]
+        # These are the points that we care in relation to a collision 
+        # when the quad is moving on the XY plane
+        quad_plane = indices[z_dists <= 1.0] # indices for points within quad z +/-1.0m
 
-            pedestrian_pts = indices[labels == float(semantic_tags2idx['Pedestrian'])]
-            vehicle_pts = indices[labels == float(semantic_tags2idx['Vehicles'])]
-            
-            pedestrian_min_dist = xy_dists[pedestrian_pts].min() if pedestrian_pts.any() else 10000
-            vehicle_min_dist = xy_dists[vehicle_pts].min() if vehicle_pts.any() else 10000
-            quad_plane_min_dist = xy_dists[quad_plane].min() if quad_plane.any() else 10000
+        landing_pts = indices[(xy_dists < LANDING_RADIUS_CHECK) & (recv_data[:,2] < 0)]
 
+        pedestrian_pts = indices[labels == float(semantic_tags2idx['Pedestrian'])]
+        vehicle_pts = indices[labels == float(semantic_tags2idx['Vehicles'])]
+        
+        pedestrian_min_dist = xy_dists[pedestrian_pts].min() if pedestrian_pts.any() else 10000
+        vehicle_min_dist = xy_dists[vehicle_pts].min() if vehicle_pts.any() else 10000
+        quad_plane_min_dist = xy_dists[quad_plane].min() if quad_plane.any() else 10000
 
-            MIN_DIST = 0.01
-            pedestrian_cost = 0
-            if pedestrian_min_dist < 30:
-                pedestrian_cost = 1/(pedestrian_min_dist + MIN_DIST)
+        MIN_DIST = 0.01 # to avoid 1/zero
+        pedestrian_cost = 0
+        if pedestrian_min_dist < DIST2PEDESTRIANS:
+            pedestrian_cost = PEDESTRIAN_COST_MULT * 1/(pedestrian_min_dist + MIN_DIST)
 
-            vehicle_cost = 0
-            if vehicle_min_dist < 30:
-                vehicle_cost = 1/(vehicle_min_dist + MIN_DIST)
+        vehicle_cost = 0
+        if vehicle_min_dist < DIST2VEHICLES:
+            vehicle_cost = VEHICLE_COST_MULT * 1/(vehicle_min_dist + MIN_DIST)
 
-            collision_cost = 0
-            if quad_plane_min_dist < 2:
-                collision_cost = 1/(quad_plane_min_dist + MIN_DIST)
+        collision_cost = 0
+        if quad_plane_min_dist < DIST2OBSTACLES:
+            collision_cost = COLLISION_COST_MULT * 1/(quad_plane_min_dist + MIN_DIST)
 
-            FIXED_LANDING_COST = 1
-            landing_cost = 0
-            if landing_pts.any():
-                # Landing cost related to the label of things below the drone
-                landing_cost = any(np.isin(recv_data[landing_pts,5], PLACES2LAND, invert=True)) * FIXED_LANDING_COST
+        landing_label_cost = 0
+        landing_flatness_cost = 0
+        if landing_pts.any():
+            # Landing cost related to the label of things below the drone
+            landing_label_cost = LANDING_COST_MULT * any(np.isin(recv_data[landing_pts,5], PLACES2LAND, invert=True))
 
-                # Landing cost related to the flatness
-                landing_cost += recv_data[landing_pts,2].std()
-
-            print(f"pedestrian_cost: {pedestrian_cost}, vehicle_cost: {vehicle_cost}, collision_cost: {collision_cost}, landing_cost: {landing_cost}")
-
-            with self.lidar_lock:
-                pass
-
-        except TransformException as ex:
-            self.get_logger().error(f'Could not transform {quad_params["map_frame"]} to {quad_params["target_frame"]}: {ex}')
+            # Landing cost related to the flatness
+            landing_flatness_cost = FLATNESS_COST_MULT * recv_data[landing_pts,2].std()
+        
+        print(f"Calculated costs [{self.carla_server_time_ns}ns]:")
+        print(f"pedestrian_cost: {pedestrian_cost}")
+        print(f"vehicle_cost: {vehicle_cost}")
+        print(f"collision_cost: {collision_cost}")
+        print(f"landing_label_cost: {landing_label_cost}")
+        print(f"landing_flatness_cost: {landing_flatness_cost}")
 
 
 def main():

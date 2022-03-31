@@ -7,10 +7,6 @@ import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
 from rclpy.node import Node
 from rclpy.time import Time
 
-from tf2_ros import TransformException
-from tf2_ros.buffer import Buffer
-from tf2_ros.transform_listener import TransformListener
-
 # from visualization_msgs.msg import MarkerArray, Marker
 from carla_msgs.msg import CarlaStatus
 from sensor_msgs.msg import PointCloud2, PointField

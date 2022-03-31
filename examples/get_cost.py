@@ -118,7 +118,7 @@ class Agent(Node):
 
         xy_dists = np.linalg.norm(recv_data[:,:2], ord=2, axis=1)
 
-        z_dists = np.linalg.norm(recv_data[:,2], ord=2)
+        z_dists = abs(recv_data[:,2])
 
         # These are the points that we care in relation to a collision 
         # when the quad is moving on the XY plane

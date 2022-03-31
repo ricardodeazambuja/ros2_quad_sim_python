@@ -17,7 +17,7 @@ from point_cloud2 import read_points
 DIST2PEDESTRIANS = 30 # [m]
 DIST2VEHICLES = 30 # [m]
 DIST2OBSTACLES = 2 # [m]
-LANDING_RADIUS_CHECK = 2 # [m]
+LANDING_RADIUS_CHECK = 1 # [m]
 
 LANDING_COST_MULT = 1
 FLATNESS_COST_MULT = 1
@@ -57,7 +57,7 @@ idx2semantic_tags.append("Terrain")     # 22
 semantic_tags2idx = {t:i for i,t in enumerate(idx2semantic_tags)}
 idx2semantic_tags = dict(enumerate(idx2semantic_tags))
 
-PLACES2LAND = ["Terrain", "Ground", "Other", "Building", "SideWalk"]
+PLACES2LAND = ["Terrain", "Ground", "Other", "Building", "SideWalk", "Unlabeled"]
 PLACES2LAND = [float(semantic_tags2idx[i]) for i in PLACES2LAND]
 
 

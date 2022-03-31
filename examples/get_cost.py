@@ -62,7 +62,8 @@ class Agent(Node):
         self.started = False
         self.curr_pos = None
         self.curr_rpy = None
-        self.time_diff_lock = Lock()
+        self.carla_server_time = None
+        self.time_lock = Lock()
         self.lidar_lock = Lock()
 
         # Get one CarlaStatus msg to learn time diff between system and carla
@@ -76,16 +77,10 @@ class Agent(Node):
     def get_carlastatus_cb(self, msg):
         s = msg.header.stamp.sec
         ns = msg.header.stamp.nanosec
-        frame = msg.frame
-        delta_t = msg.fixed_delta_seconds
-        carla_time = frame*delta_t*1E9
-        system_time = s*1E9 + ns
+        with self.time_lock:
+            self.carla_server_time = s*1E9 + ns
 
-        with self.time_diff_lock:
-            self.carla_time_diff_ns = system_time-carla_time
-            print("Time diff received!")
-
-        # self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
+        self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
 
         if not self.started:
             self.started = True
@@ -102,8 +97,12 @@ class Agent(Node):
 
     def receive_semantic_lidar_cb(self, msg):
         try:
-            with self.time_diff_lock:
-                now = Time(nanoseconds=(rclpy.clock.Clock().now().nanoseconds - self.carla_time_diff_ns))
+            s = msg.header.stamp.sec
+            ns = msg.header.stamp.nanosec
+            with self.time_lock:
+                self.carla_server_time = s*1E9 + ns
+
+            now = Time(nanoseconds=0.0) #get the latest tf
 
             # Check for tf
             trans = self.tf_buffer.lookup_transform(
@@ -113,8 +112,8 @@ class Agent(Node):
 
             self.get_logger().info(f'TF received {trans}')
             self.curr_pos = np.array([trans.transform.translation.x, 
-                             trans.transform.translation.y, 
-                             trans.transform.translation.z])
+                                      trans.transform.translation.y, 
+                                      trans.transform.translation.z])
 
             init_quat = [trans.transform.rotation.x,
                         trans.transform.rotation.y,
@@ -170,10 +169,13 @@ class Agent(Node):
             FIXED_LANDING_COST = 1
             landing_cost = 0
             if landing_pts.any():
+                # Landing cost related to the label of things below the drone
                 landing_cost = any(np.isin(recv_data[landing_pts,5], PLACES2LAND, invert=True)) * FIXED_LANDING_COST
 
+                # Landing cost related to the flatness
+                landing_cost += recv_data[landing_pts,2].std()
+
             print(f"pedestrian_cost: {pedestrian_cost}, vehicle_cost: {vehicle_cost}, collision_cost: {collision_cost}, landing_cost: {landing_cost}")
-            self.get_logger().info('Lidar received!')
 
             with self.lidar_lock:
                 pass

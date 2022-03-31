@@ -60,8 +60,6 @@ class Agent(Node):
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
 
         self.started = False
-        self.curr_pos = None
-        self.curr_rpy = None
         self.carla_server_time = None
         self.time_lock = Lock()
         self.lidar_lock = Lock()
@@ -82,18 +80,11 @@ class Agent(Node):
 
         self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
 
-        if not self.started:
-            self.started = True
-            # Timer for the tf
-            self.tf_buffer = Buffer()
-            self.tf_listener = TransformListener(self.tf_buffer, self)
-
-            self.receive_semantic_lidar = self.create_subscription(
-                PointCloud2,
-                "/carla/flying_sensor/lidar",
-                self.receive_semantic_lidar_cb,
-                1)
-
+        self.receive_semantic_lidar = self.create_subscription(
+            PointCloud2,
+            "/carla/flying_sensor/lidar",
+            self.receive_semantic_lidar_cb,
+            1)
 
     def receive_semantic_lidar_cb(self, msg):
         try:
@@ -101,27 +92,6 @@ class Agent(Node):
             ns = msg.header.stamp.nanosec
             with self.time_lock:
                 self.carla_server_time = s*1E9 + ns
-
-            now = Time(nanoseconds=0.0) #get the latest tf
-
-            # Check for tf
-            trans = self.tf_buffer.lookup_transform(
-                quad_params["map_frame"],
-                quad_params["target_frame"],
-                now)
-
-            self.get_logger().info(f'TF received {trans}')
-            self.curr_pos = np.array([trans.transform.translation.x, 
-                                      trans.transform.translation.y, 
-                                      trans.transform.translation.z])
-
-            init_quat = [trans.transform.rotation.x,
-                        trans.transform.rotation.y,
-                        trans.transform.rotation.z,
-                        trans.transform.rotation.w]
-
-            self.curr_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
-
 
             # Read semantic lidar
             recv_data = []
@@ -134,16 +104,16 @@ class Agent(Node):
             labels = recv_data[:, 5]
             indices = np.arange(recv_data.shape[0])
 
-            xy_dists = np.linalg.norm(recv_data[:,:2] - self.curr_pos[:2], ord=2, axis=1)
+            xy_dists = np.linalg.norm(recv_data[:,:2], ord=2, axis=1)
 
-            z_dists = np.linalg.norm(recv_data[:,2] - self.curr_pos[2], ord=2)
+            z_dists = np.linalg.norm(recv_data[:,2], ord=2)
 
             # These are the points that we care in relation to a collision 
             # when the quad is moving on the XY plane
             quad_plane = indices[z_dists <= 1.0] # indices for points within quad z +/-1.0m
 
             LANDING_RADIUS = 2
-            landing_pts = indices[(xy_dists < LANDING_RADIUS) & ((recv_data[:,2] - self.curr_pos[2]) < 0)]
+            landing_pts = indices[(xy_dists < LANDING_RADIUS) & (recv_data[:,2] < 0)]
 
             pedestrian_pts = indices[labels == float(semantic_tags2idx['Pedestrian'])]
             vehicle_pts = indices[labels == float(semantic_tags2idx['Vehicles'])]

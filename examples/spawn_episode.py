@@ -94,7 +94,7 @@ class SpawnEpisode(Node):
                 pose = Pose()
                 pose.position.x = float(central_location[0]+x)
                 pose.position.y = float(central_location[1]+y)
-                pose.position.z = float(central_location[2])
+                pose.position.z = float(central_location[2]+1.0) #1.0 is to avoid having them falling through the map
                 res_id = self.spawn_actor(rs.choice(walkers), f"walker_{i:03d}", pose)
                 t += 1
                 if res_id != -1:

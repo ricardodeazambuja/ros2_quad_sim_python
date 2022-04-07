@@ -58,7 +58,7 @@ class SyncTestSubscriber(Node):
                                                 "topic_name": '/carla/flying_sensor/depth_down/image'}
                      }
 
-        self.synced_msgs = SyncROS2Messages(self, topic_dict, self.process_msgs, max_delta_t=0.1)
+        self.synced_msgs = SyncROS2Messages(self, topic_dict, self.process_msgs, max_delta_t=max_delta_t)
 
 
 
@@ -97,11 +97,11 @@ class SyncTestSubscriber(Node):
         self.get_logger().info(f"pedestrians_mask {pedestrians_mask.shape}")
         vehicles_mask = self.get_mask(segm_img, 'Vehicles')
         
-        if len(pedestrians_mask):
+        if pedestrians_mask.any():
             pedestrian_horizontal_dist = radius[pedestrians_mask].flatten()
             self.get_logger().info(f"pedestrian_horizontal_dist {pedestrian_horizontal_dist[pedestrian_horizontal_dist.argsort()][:10]}")
         
-        if len(vehicles_mask):
+        if vehicles_mask.any():
             vehicles_horizontal_dist = radius[vehicles_mask].flatten()
             self.get_logger().info(f"vehicles_horizontal_dist {vehicles_horizontal_dist[vehicles_horizontal_dist.argsort()][:10]}")        
 
@@ -116,8 +116,11 @@ def main(args=None):
 
         try:
             executor.spin()
+        except KeyboardInterrupt:
+            pass
         finally:
             executor.shutdown()
+            synctest_subscriber.synced_msgs.stop = True
             synctest_subscriber.destroy_node()
     finally:
         rclpy.shutdown()

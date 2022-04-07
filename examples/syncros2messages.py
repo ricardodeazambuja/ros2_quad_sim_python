@@ -1,12 +1,16 @@
-from threading import Barrier, BrokenBarrierError, Event
+from threading import Lock, Thread
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 class SyncROS2Messages:
     def __init__(self, node, topic_dict, func_process_msgs, max_delta_t=0.1):
         # topic_dict={"label":{"msg_type": ros_msg_type, "topic_name": "topic"}}
-        self.msgs = {label:None for label in topic_dict.keys()}
-        self.process_msgs_ev = Event()
-        self.barrier = Barrier(len(topic_dict), action=self.process_msgs(func_process_msgs), timeout=max_delta_t)
+        self._msgs = {label:None for label in topic_dict.keys()}
+        self._subscriber_recv = {label: False for label in topic_dict.keys()}
+        self._process_lock = Lock()
+        self.stop = False
+        self.max_delta_t = max_delta_t
+
+        self._process_thread = Thread(target=self._wait2process, args=(func_process_msgs,))
 
         self.subscribers = []
         for label in topic_dict.keys():
@@ -15,29 +19,28 @@ class SyncROS2Messages:
             sub = node.create_subscription(
                 msg_type,
                 topic,
-                self.callback_gen(label),
+                self._callback_gen(label),
                 1, callback_group=ReentrantCallbackGroup())
             self.subscribers.append(sub)
 
+        self._process_thread.start()
 
-    def callback_gen(self, label):
+
+    def _wait2process(self, func_process_msgs):
+        while not self.stop:
+            if self._process_lock.acquire(blocking=True, timeout=self.max_delta_t):
+                if all(self._subscriber_recv.values()):
+                    for key in self._subscriber_recv.keys():
+                        self._subscriber_recv[key] = False
+                    func_process_msgs(self._msgs)
+                self._process_lock.release()
+
+
+    def _callback_gen(self, label):
         def callback(msg):
-            try:
-                if not self.process_msgs_ev.is_set():
-                    self.msgs[label] = msg
-                    self.barrier.wait()
-            except BrokenBarrierError:
-                self.barrier.reset()
+            if self._process_lock.acquire(blocking=True, timeout=self.max_delta_t):
+                self._msgs[label] = msg
+                self._subscriber_recv[label] = True
+                self._process_lock.release()
+                
         return callback
-
-
-    def process_msgs(self, in_func):
-        def out_func():
-            # block subscribers from receiving new messages
-            self.process_msgs_ev.set()
-
-            in_func(self.msgs)
-
-            # free the subscribers to receive new msgs
-            self.process_msgs_ev.clear()
-        return out_func

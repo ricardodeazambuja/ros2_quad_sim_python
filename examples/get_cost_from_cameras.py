@@ -1,4 +1,5 @@
 import numpy as np
+import cv2 as cv
 
 import rclpy
 from rclpy.node import Node
@@ -41,6 +42,7 @@ LABELS = {
 'Terrain':      (145, 170, 100)
 }
 
+PLACES2LAND = ["Terrain", "Ground", "Other", "Building", "SideWalk", "Unlabeled"]
 
 MIN_DIST = 0.01 # to avoid 1/zero
 
@@ -77,6 +79,17 @@ class CostMapGenNode(Node):
         # img is BGR!
         return (img[...,2] == LABELS[label][0]) & (img[...,1] == LABELS[label][1]) & (img[...,0] == LABELS[label][2])
 
+    @staticmethod
+    def draw_rays(img, thickness=5):
+        # Find contours
+        contours, hierarchy = cv.findContours(img, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        # Draw contours
+        output = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
+        for c in contours:
+            for ci in c:
+                cv.line(output,(CX,CY),(ci[0][0],ci[0][1]),(255,0,0),thickness)
+
+        return output
 
     def process_msgs(self, msg_dict):
         
@@ -97,16 +110,38 @@ class CostMapGenNode(Node):
         pedestrians_mask = self.get_mask(segm_img, 'Pedestrian')
 
         vehicles_mask = self.get_mask(segm_img, 'Vehicles')
+
+        # places to land mask
+        places2land_mask = np.ones(segm_img.shape[:2])==1
+        for label in PLACES2LAND:
+            places2land_mask &= self.get_mask(segm_img, label)
+        places2land_mask = np.logical_not(places2land_mask).astype(float)
         
         cost_map = np.zeros(one_over_radius.shape)
-        if pedestrians_mask.any():
-            cost_map += one_over_radius*pedestrians_mask
-        
-        if vehicles_mask.any():
-            cost_map += one_over_radius*vehicles_mask
 
-        cost_map = 255*(cost_map-cost_map.min())/cost_map.max()
+        # cost for pedestrians
+        if pedestrians_mask.any():
+            output = self.draw_rays((pedestrians_mask*255).astype('uint8'))
+            pedestrians_cost = one_over_radius*pedestrians_mask + radius*output
+            cost_map += pedestrians_cost/pedestrians_cost.max()
+        
+        # cost for vehicles
+        if vehicles_mask.any():
+            output = self.draw_rays((vehicles_mask*255).astype('uint8'))
+            vehicles_cost = one_over_radius*vehicles_mask + radius*output
+            cost_map += vehicles_cost/vehicles_cost.max()
+
+        # cost for landing terrain label
+        cost_map += places2land_mask
+
+        # cost for depth roughness
+        roughness_cost = abs(depth_img - depth_img.mean())
+        cost_map += roughness_cost/roughness_cost.max()
+
         self.get_logger().info(f"cost_map - max:{cost_map.max()}, min: {cost_map.min()}")
+
+        cost_map = 255*cost_map/cost_map.max()
+        
         msg = self.cv_bridge.cv2_to_imgmsg((cost_map).astype('uint8'), 
                                             encoding='mono8')
 

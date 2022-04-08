@@ -41,10 +41,13 @@ LABELS = {
 'Terrain':      (145, 170, 100)
 }
 
-class SyncTestSubscriber(Node):
+
+MIN_DIST = 0.01 # to avoid 1/zero
+
+class CostMapGenNode(Node):
 
     def __init__(self, max_delta_t=0.1):
-        super().__init__('synctest_subscriber')
+        super().__init__('costmapgen_node')
         self.get_logger().info("Starting!")
         
         self.xa = ((CX-np.arange(0,RESX))/FX)
@@ -60,6 +63,7 @@ class SyncTestSubscriber(Node):
 
         self.synced_msgs = SyncROS2Messages(self, topic_dict, self.process_msgs, max_delta_t=max_delta_t)
 
+        self.costmap_pub = self.create_publisher(Image, f'/costmapgen_node/image', 10)
 
 
     def get_xmatrix_from_depth(self, zmatrix):
@@ -82,37 +86,40 @@ class SyncTestSubscriber(Node):
         # process received msgs
         self.get_logger().info("Processing msgs!")
         depth_img = self.cv_bridge.imgmsg_to_cv2(depth_down_msg)
-        self.get_logger().info(f"Depth img {depth_img.shape}")
         xmatrix = self.get_xmatrix_from_depth(depth_img)
-        self.get_logger().info(f"xmatrix {xmatrix.shape}")
         ymatrix = self.get_ymatrix_from_depth(depth_img)
-        self.get_logger().info(f"ymatrix {ymatrix.shape}")
         radius = xmatrix**2 + ymatrix**2
-        self.get_logger().info(f"radius {radius.shape}")
+
+        one_over_radius = 1/(radius+MIN_DIST)
 
         segm_img = self.cv_bridge.imgmsg_to_cv2(semantic_segmentation_down_msg)[:,:,:3]
-        self.get_logger().info(f"Segm img {segm_img.shape}")
 
         pedestrians_mask = self.get_mask(segm_img, 'Pedestrian')
-        self.get_logger().info(f"pedestrians_mask {pedestrians_mask.shape}")
+
         vehicles_mask = self.get_mask(segm_img, 'Vehicles')
         
+        cost_map = np.zeros(one_over_radius.shape)
         if pedestrians_mask.any():
-            pedestrian_horizontal_dist = radius[pedestrians_mask].flatten()
-            self.get_logger().info(f"pedestrian_horizontal_dist {pedestrian_horizontal_dist[pedestrian_horizontal_dist.argsort()][:10]}")
+            cost_map += one_over_radius*pedestrians_mask
         
         if vehicles_mask.any():
-            vehicles_horizontal_dist = radius[vehicles_mask].flatten()
-            self.get_logger().info(f"vehicles_horizontal_dist {vehicles_horizontal_dist[vehicles_horizontal_dist.argsort()][:10]}")        
+            cost_map += one_over_radius*vehicles_mask
 
+        cost_map = 255*(cost_map-cost_map.min())/cost_map.max()
+        self.get_logger().info(f"cost_map - max:{cost_map.max()}, min: {cost_map.min()}")
+        msg = self.cv_bridge.cv2_to_imgmsg((cost_map).astype('uint8'), 
+                                            encoding='mono8')
+
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self.costmap_pub.publish(msg)
 
 
 def main(args=None):
     rclpy.init(args=args)
     try:
-        synctest_subscriber = SyncTestSubscriber()
+        costmapgen_node = CostMapGenNode()
         executor = MultiThreadedExecutor(num_threads=4)
-        executor.add_node(synctest_subscriber)
+        executor.add_node(costmapgen_node)
 
         try:
             executor.spin()
@@ -120,8 +127,8 @@ def main(args=None):
             pass
         finally:
             executor.shutdown()
-            synctest_subscriber.synced_msgs.stop = True
-            synctest_subscriber.destroy_node()
+            costmapgen_node.synced_msgs.stop = True
+            costmapgen_node.destroy_node()
     finally:
         rclpy.shutdown()
 

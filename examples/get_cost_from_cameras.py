@@ -55,15 +55,35 @@ class CostMapGenNode(Node):
         self.xa = ((CX-np.arange(0,RESX))/FX)
         self.ya = ((CY-np.arange(0,RESY))/FY)[:,np.newaxis]
 
+        self.x_indices = np.vstack([np.arange(640) for i in range(480)])
+        self.y_indices = np.vstack([np.arange(480) for i in range(640)]).T
+
         self.cv_bridge = CvBridge()
 
-        topic_dict = {"semantic_segmentation_down": {"msg_type": Image, 
+        self.topic_dict = {
+                      "semantic_segmentation_down": {"msg_type": Image, 
                                                 "topic_name": '/carla/flying_sensor/semantic_segmentation_down/image'},
                       "depth_down": {"msg_type": Image, 
-                                                "topic_name": '/carla/flying_sensor/depth_down/image'}
+                                                "topic_name": '/carla/flying_sensor/depth_down/image'},
+                      "semantic_segmentation_front": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/semantic_segmentation_front/image'},
+                      "depth_front": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/depth_front/image'},
+                      "semantic_segmentation_back": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/semantic_segmentation_back/image'},
+                      "depth_back": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/depth_back/image'},
+                      "semantic_segmentation_left": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/semantic_segmentation_left/image'},
+                      "depth_left": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/depth_left/image'},
+                      "semantic_segmentation_right": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/semantic_segmentation_right/image'},
+                      "depth_right": {"msg_type": Image, 
+                                                "topic_name": '/carla/flying_sensor/depth_right/image'}
                      }
 
-        self.synced_msgs = SyncROS2Messages(self, topic_dict, self.process_msgs, max_delta_t=max_delta_t)
+        self.synced_msgs = SyncROS2Messages(self, self.topic_dict, self.process_msgs, max_delta_t=max_delta_t)
 
         self.costmap_pub = self.create_publisher(Image, f'/costmapgen_node/image', 10)
 
@@ -79,20 +99,42 @@ class CostMapGenNode(Node):
         # img is BGR!
         return (img[...,2] == LABELS[label][0]) & (img[...,1] == LABELS[label][1]) & (img[...,0] == LABELS[label][2])
 
-    @staticmethod
-    def draw_rays(img, thickness=5):
+    def get_heat(self, img, thickness=5):
         # Find contours
-        contours, hierarchy = cv.findContours(img, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        kernel = np.ones((5,5),np.uint8)
+        dilation = cv.dilate(img,kernel,iterations = 5)
+        erosion = cv.erode(dilation,kernel,iterations = 5)
+        contours, hierarchy = cv.findContours(dilation, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         # Draw contours
-        output = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-        for c in contours:
-            for ci in c:
-                cv.line(output,(CX,CY),(ci[0][0],ci[0][1]),(255,0,0),thickness)
+        output = np.zeros((img.shape[0], img.shape[1]), dtype=np.float64)
+        max_val = 1
+        for i,c in enumerate(contours):
+            M = cv.moments(c)
+            if M["m00"] != 0:
+                px = int(M["m10"] / M["m00"])
+                py = int(M["m01"] / M["m00"])
+                r = max_val/(np.sqrt((self.x_indices-px)**2+(self.y_indices-py)**2)+1)**(1/2)
+                print(r.max(), r.min())
+                output += r
+                output[output>max_val]=max_val
+                #cv.circle(output, (px, py), 5, (255, 0, 0), -1)
+
+            # for ci in c:
+            #     cv.line(output,(CX,CY),(ci[0][0],ci[0][1]),(255,0,0),thickness)
 
         return output
 
     def process_msgs(self, msg_dict):
         
+        depth_front_msg = msg_dict['depth_front']
+        depth_front_img = self.cv_bridge.imgmsg_to_cv2(depth_front_msg)
+        depth_back_msg = msg_dict['depth_back']
+        depth_back_img = self.cv_bridge.imgmsg_to_cv2(depth_back_msg)
+        depth_left_msg = msg_dict['depth_left']
+        depth_left_img = self.cv_bridge.imgmsg_to_cv2(depth_left_msg)
+        depth_right_msg = msg_dict['depth_right']
+        depth_right_img = self.cv_bridge.imgmsg_to_cv2(depth_right_msg)
+
         depth_down_msg = msg_dict['depth_down']
         semantic_segmentation_down_msg = msg_dict['semantic_segmentation_down']
 
@@ -121,22 +163,39 @@ class CostMapGenNode(Node):
 
         # cost for pedestrians
         if pedestrians_mask.any():
-            output = self.draw_rays((pedestrians_mask*255).astype('uint8'))
-            pedestrians_cost = one_over_radius*pedestrians_mask + radius*output
-            cost_map += pedestrians_cost/pedestrians_cost.max()
+            cost_map += self.get_heat((pedestrians_mask*255).astype('uint8'))
+            # pedestrians_cost = one_over_radius*pedestrians_mask + radius*output
+            # cost_map += pedestrians_cost/pedestrians_cost.max()
         
         # cost for vehicles
         if vehicles_mask.any():
-            output = self.draw_rays((vehicles_mask*255).astype('uint8'))
-            vehicles_cost = one_over_radius*vehicles_mask + radius*output
-            cost_map += vehicles_cost/vehicles_cost.max()
+            cost_map += self.get_heat((vehicles_mask*255).astype('uint8'))
+            # vehicles_cost = one_over_radius*vehicles_mask + radius*output
+            # cost_map += vehicles_cost/vehicles_cost.max()
 
         # cost for landing terrain label
         cost_map += places2land_mask
 
         # cost for depth roughness
         roughness_cost = abs(depth_img - depth_img.mean())
+        roughness_cost = cv.blur(roughness_cost,(64,64))
         cost_map += roughness_cost/roughness_cost.max()
+
+        # cost_map = cv.resize(cost_map, (640,640))
+
+        # df = 1/(depth_front_img.sum(axis=0)+MIN_DIST)
+        # db = 1/(depth_back_img.sum(axis=0)+MIN_DIST)
+        # dl = 1/(depth_left_img.sum(axis=0)+MIN_DIST)
+        # dr = 1/(depth_right_img.sum(axis=0)+MIN_DIST)
+
+        # for i in range(320):
+        #     cost_map[i,:] += df/df.max()
+        #     cost_map[cost_map.shape[0]-1-i,:] += db/db.max()
+
+        # for i in range(320):
+        #     cost_map[:,i] += dl/dl.max()
+        #     cost_map[:,cost_map.shape[1]-1-i] += dr/dr.max()
+
 
         self.get_logger().info(f"cost_map - max:{cost_map.max()}, min: {cost_map.min()}")
 

@@ -15,6 +15,8 @@ setup(
             ['package.xml']),
         ('share/' + package_name + '/cfg', 
             ['cfg/rviz_flying_sensor.rviz']),
+        ('share/' + package_name + '/cfg', 
+            ['cfg/flying_sensor.json']),
         ('share/' + package_name, 
             glob('launch/*.launch.py'))
     ],

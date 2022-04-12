@@ -17,7 +17,7 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('carla_spawn_objects'), 'carla_spawn_objects.launch.py')]),
       launch_arguments={'objects_definition_file': os.path.join(
-         get_package_share_directory('carla_spawn_objects'), 'config/flying_sensor.json')}.items(),
+         get_package_share_directory('ros2_quad_sim_python'), 'cfg/flying_sensor.json')}.items(),
       )
    quad_sim = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(

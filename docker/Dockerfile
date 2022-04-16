@@ -15,3 +15,6 @@ RUN /bin/bash -c 'source /opt/ros/galactic/setup.bash; rosdep update; rosdep ins
 
 RUN echo "export PATH=$PATH:/home/ros2user/.local/bin" >> /home/ros2user/.bashrc
 RUN echo "source /home/ros2user/carla-ros/install/setup.bash" >> /home/ros2user/.bashrc
+RUN echo "source /usr/share/colcon_cd/function/colcon_cd.sh" >> /home/ros2user/.bashrc
+RUN echo "export _colcon_cd_root=/home/ros2user/carla-ros/" >> /home/ros2user/.bashrc
+RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /home/ros2user/.bashrc

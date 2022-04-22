@@ -47,7 +47,7 @@ class SpawnEpisode(Node):
             central_pos = np.array(central_pos)
             assert central_pos.shape[0] == 3
 
-            spawn_point = csp_locations[np.argsort(((csp_locations - central_pos)**2).sum())[0]]
+            spawn_point = csp_locations[np.argsort(((csp_locations - central_pos)**2).sum(axis=1))[0]]
 
         # Calculates the distances between the selected spawn point to all others
         dists = np.linalg.norm(csp_locations - spawn_point, ord=2, axis=1)

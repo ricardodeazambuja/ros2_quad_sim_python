@@ -182,13 +182,10 @@ class QuadSim(Node):
         self.sim_publish_full_state_timer = self.create_timer(params['Tfs'], self.on_sim_publish_fs)
         self.sim_publish_pose_timer = self.create_timer(params['Tp'], self.on_sim_publish_pose)
 
-        # self.tf_timer = self.create_timer(self.Ts*2, self.on_tf_timer)
-
         self.get_logger().info(f'Simulator started!')
 
         self.quadpos_pub = self.create_publisher(Pose, f'/carla/{quad_params["target_frame"]}/control/set_transform',1)
         self.quadstate_pub = self.create_publisher(QuadState, f'/quadsim/{quad_params["target_frame"]}/state',1)
-        self.imu_pub = self.create_publisher(Imu, f'/quadsim/{quad_params["target_frame"]}/imu/data',1)
 
         self.receive_w_cmd = self.create_subscription(
             QuadMotors,
@@ -266,7 +263,6 @@ class QuadSim(Node):
         if not self.t:
             return
         state_msg = QuadState()
-        imu_msg = Imu()
         with self.sim_pub_lock:
             now = Time(nanoseconds=self.t*1E9).to_msg()
             state_msg.header.stamp = now
@@ -279,20 +275,7 @@ class QuadSim(Node):
             state_msg.omega = self.curr_state[16:19][:]
             state_msg.omega_dot = self.curr_state[19:22][:]
 
-        imu_msg.header.stamp = now
-        imu_msg.orientation.x = state_msg.quat[0]
-        imu_msg.orientation.y = state_msg.quat[1]
-        imu_msg.orientation.z = state_msg.quat[2]
-        imu_msg.orientation.w = state_msg.quat[3]
-        imu_msg.angular_velocity.x = state_msg.omega[0]
-        imu_msg.angular_velocity.y = state_msg.omega[1]
-        imu_msg.angular_velocity.z = state_msg.omega[2]
-        imu_msg.linear_acceleration.x = state_msg.vel[0]
-        imu_msg.linear_acceleration.y = state_msg.vel[1]
-        imu_msg.linear_acceleration.z = state_msg.vel[2]
-
         self.quadstate_pub.publish(state_msg)
-        self.imu_pub.publish(imu_msg)
         self.get_logger().debug(f'Quad State: {self.curr_state}')
 
 def main():

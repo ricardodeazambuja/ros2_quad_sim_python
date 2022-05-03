@@ -24,7 +24,7 @@ def generate_launch_description():
             package='ros2_quad_sim_python',
             executable='quadsim',
             name='quadsim',
-            output='screen',
+            output={'both': 'log'},
             emulate_tty='True',
             on_exit=launch.actions.Shutdown(),
             parameters=[

@@ -7,6 +7,8 @@ from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
+# You need to install (or have in your workspace):
+# https://github.com/ricardodeazambuja/depthimage_to_pointcloud2
 
 def generate_launch_description():
     sensor_prefix = ['back', 'front', 'right', 'left', 'down']

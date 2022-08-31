@@ -15,6 +15,7 @@ CX = 320
 CY = 240
 FX = 432.455
 FY = 432.455
+QUAD_RADIUS = 0.5
 
 LABELS = {
 'Unlabeled':    (0, 0, 0),
@@ -144,8 +145,31 @@ class CostMapGenNode(Node):
         xmatrix = self.get_xmatrix_from_depth(depth_img)
         ymatrix = self.get_ymatrix_from_depth(depth_img)
         radius = xmatrix**2 + ymatrix**2
+        # one_over_radius = 1/(radius+MIN_DIST)
 
-        one_over_radius = 1/(radius+MIN_DIST)
+        max_y_down = ymatrix[0,:].mean()
+        diff_y = np.linspace(0,max_y_down,240)
+        max_x_down = xmatrix.max()
+        min_x_down = xmatrix.min()
+        diff_x = np.linspace(max_x_down,min_x_down,640)
+
+        xmatrix_front = self.get_xmatrix_from_depth(depth_front_img)
+        visible_depth_front = depth_front_img <= max_y_down
+        visible_depth_front &= xmatrix_front <=  max_x_down
+        visible_depth_front &= xmatrix_front >=  min_x_down
+
+        cost_map = np.zeros(depth_img.shape)
+        #cost_map[visible_depth_front] = 1            
+        for i in range(depth_img.shape[0]):
+            for j in range(depth_img.shape[1]):
+                if visible_depth_front[i,j]:
+                    x = xmatrix_front[i,j]
+                    y = depth_front_img[i,j]
+                    xj = np.argmin(abs(diff_x-x))
+                    yi = 240-np.argmin(abs(diff_y-y))
+                    #_ , xj = np.unravel_index(np.argmin(abs(xmatrix-x)), xmatrix.shape)
+                    #yi, _  = np.unravel_index(np.argmin(abs(ymatrix-y)), ymatrix.shape)
+                    cost_map[:yi,xj] = 1
 
         segm_img = self.cv_bridge.imgmsg_to_cv2(semantic_segmentation_down_msg)[:,:,:3]
 
@@ -158,20 +182,16 @@ class CostMapGenNode(Node):
         for label in PLACES2LAND:
             places2land_mask &= self.get_mask(segm_img, label)
         places2land_mask = np.logical_not(places2land_mask).astype(float)
-        
-        cost_map = np.zeros(one_over_radius.shape)
+
 
         # cost for pedestrians
         if pedestrians_mask.any():
             cost_map += self.get_heat((pedestrians_mask*255).astype('uint8'))
-            # pedestrians_cost = one_over_radius*pedestrians_mask + radius*output
-            # cost_map += pedestrians_cost/pedestrians_cost.max()
+
         
         # cost for vehicles
         if vehicles_mask.any():
             cost_map += self.get_heat((vehicles_mask*255).astype('uint8'))
-            # vehicles_cost = one_over_radius*vehicles_mask + radius*output
-            # cost_map += vehicles_cost/vehicles_cost.max()
 
         # cost for landing terrain label
         cost_map += places2land_mask
@@ -200,6 +220,9 @@ class CostMapGenNode(Node):
         self.get_logger().info(f"cost_map - max:{cost_map.max()}, min: {cost_map.min()}")
 
         cost_map = 255*cost_map/cost_map.max()
+
+        # Visualize quad radius (the area the quad would fill)
+        # cost_map[radius<=QUAD_RADIUS] = 255
         
         msg = self.cv_bridge.cv2_to_imgmsg((cost_map).astype('uint8'), 
                                             encoding='mono8')

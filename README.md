@@ -60,8 +60,8 @@ These are the commands to launch things individually:
 ```
 $ ros2 launch carla_ros_bridge carla_ros_bridge.launch.py passive:=False town:=Town01
 $ ros2 launch carla_spawn_objects carla_spawn_objects.launch.py objects_definition_file:=src/ros-bridge/carla_spawn_objects/config/flying_sensor.json
-$ ros2 run quad_sim_python quadsim --ros-args -p init_pose:=[0,0,2,0,0,0]
-$ ros2 run quad_sim_python quadctrl --ros-args -p Px:=2 -p Py:=2 -p Pz:=1
+$ ros2 run ros2_quad_sim_python quadsim --ros-args -p init_pose:=[0,0,2,0,0,0]
+$ ros2 run ros2_quad_sim_python quadctrl --ros-args -p Px:=2 -p Py:=2 -p Pz:=1
 $ ros2 run rviz2 rviz2 --ros-args -d ~/carla-ros/install/ros2_quad_sim_python/share/ros2_quad_sim_python/cfg/rviz_flying_sensor.rviz
 ```
 

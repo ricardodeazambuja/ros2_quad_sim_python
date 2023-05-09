@@ -19,14 +19,13 @@ from rclpy_param_helper import Dict2ROS2Params, ROS2Params2Dict
 
 from quad_sim_python import Controller
 
-from . import ros_quad_sim as rqs
-
+import ros_quad_sim as rqs
 
 ctrl_params = {
             # Position P gains
-            "Px"    : 2.0,
-            "Py"    : 2.0,
-            "Pz"    : 1.0,
+            "Px"    : 5.0,
+            "Py"    : 5.0,
+            "Pz"    : 2.0,
 
             # Velocity P-D gains
             "Pxdot" : 5.0,
@@ -42,8 +41,8 @@ ctrl_params = {
             "Izdot" : 5.0,
 
             # Attitude P gains
-            "Pphi"   : 8.0,
-            "Ptheta" : 8.0,
+            "Pphi"   : 4.0,
+            "Ptheta" : 4.0,
             "Ppsi"   : 1.5,
 
             # Rate P-D gains
@@ -64,7 +63,7 @@ ctrl_params = {
             "saturateVel_separately" : True,
 
             # Max tilt [degrees]
-            "tiltMax" : 50.0,
+            "tiltMax" : 30.0,
 
             # Max Rate [rad/s]
             "pMax" : 200.0,
@@ -87,10 +86,15 @@ class QuadSimAndCtrl(rqs.QuadSim):
 
         super().__init__()
 
+        self.quadsim_timer = self.create_timer(1.0, self.on_quadsim_timer)
+
+    def on_quadsim_timer(self):
         # a far from elegant way to wait for quadsim...
-        while self.receive_w_cmd is None:
+        if self.receive_w_cmd is None:
             self.get_logger().info(f'Waiting for quadsim...')
-            time.sleep(1)
+            return
+        # Now we don't need the time anymore
+        self.destroy_timer(self.quadsim_timer)
         
         # the motor commands (w_cmd) will be generated in this node, 
         # therefore we don't need this subscriber
@@ -113,7 +117,7 @@ class QuadSimAndCtrl(rqs.QuadSim):
         # --ros-args -p Px:=5
         # --ros-args --params-file params.yaml
         # Here 'quadsim' is used because this class inherits from ros_quad_sim.QuadSim
-        read_params = ROS2Params2Dict(self, 'quadsim', ctrl_params.keys())
+        read_params = ROS2Params2Dict(self, 'quadsim', list(ctrl_params.keys())+["Tfs"])
         for k,v in read_params.items():
             # Update local parameters
             ctrl_params[k] = v
@@ -121,8 +125,16 @@ class QuadSimAndCtrl(rqs.QuadSim):
         # Update ROS2 parameters
         Dict2ROS2Params(self, ctrl_params) # the controller needs to read some parameters from here
 
-        # it's safe to access them here without locks
-        self.quad_params = rqs.quad_params
+        parameters_received = False
+        while not parameters_received:
+            quad_params_list = ['mB', 'g', 'IB', 'maxThr', 'minThr', 'orient', 'mixerFMinv', 'minWmotor', 'maxWmotor', 
+                                'target_frame']
+            self.quad_params = ROS2Params2Dict(self, 'quadsim', quad_params_list)
+            if quad_params_list == list(self.quad_params.keys()):
+                parameters_received = True
+            else:
+                self.get_logger().warn(f'Waiting for quadsim parameters!')
+                time.sleep(1)
 
         # Start the controller
         self.ctrl = Controller(self.quad_params, orient=self.quad_params['orient'], params=ctrl_params)
@@ -138,7 +150,9 @@ class QuadSimAndCtrl(rqs.QuadSim):
             f"/quadctrl/{self.quad_params['target_frame']}/ctrl_twist_sp",
             self.receive_control_twist_cb,
             1)
-      
+        
+        self.ctrl_loop_timer = self.create_timer(ctrl_params['Tfs'], self.on_ctrl_loop_timer)
+
     def receive_control_sp_cb(self, sp_msg):
         with self.ctrl_sp_lock:
             self.curr_sp = sp_msg
@@ -159,15 +173,14 @@ class QuadSimAndCtrl(rqs.QuadSim):
 
         self.get_logger().info(f'Received twist setpoint: {self.curr_sp}')
 
-
-    # THIS NEEDS TO BE CALLED BY A TIMER!!!!
-    def receive_quadstate_cb(self):
+    def on_ctrl_loop_timer(self):
         # Lock from quadsim...
         # It doesn't make sense to generate new motor speed values
         # without having an update for the quad states
-        with self.sim_pub_lock():
+        with self.sim_pub_lock:
             if self.ctrl_t is None:
                 self.ctrl_prev_t = self.ctrl_t = self.t
+                self.curr_sp.pos = copy(self.curr_state[0:3][:])
                 return
             else:
                 self.ctrl_prev_t = self.ctrl_t
@@ -200,11 +213,13 @@ class QuadSimAndCtrl(rqs.QuadSim):
         # Send the new motor speed values
         with self.w_cmd_lock:
             self.w_cmd = [int(m) for m in w_cmd]
+            self.get_logger().debug(f'Sending w_cmd: {self.w_cmd}')
 
 
 def main(args=None):
     print("Starting QuadSimAndCtrl...")
     rclpy.init(args=args)
+    
     try:
         quad_node = QuadSimAndCtrl()
         executor = MultiThreadedExecutor(num_threads=4)

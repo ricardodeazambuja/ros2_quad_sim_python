@@ -3,7 +3,6 @@ curr_path = os.getcwd()
 if os.path.basename(curr_path) not in sys.path:
     sys.path.append(os.path.dirname(os.getcwd()))
 
-from time import sleep
 from threading import Lock
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -72,8 +71,11 @@ class QuadSim(Node):
         super().__init__('quadsim', 
                          allow_undeclared_parameters=True, # necessary for using set_parameters
                          automatically_declare_parameters_from_overrides=True) # allows command line parameters
+        
+        self.get_logger().info(f'Starting quadsim...')
 
         self.t = None
+        self.res = None
         self.w_cmd_lock = Lock()
         self.wind_lock = Lock()
         self.sim_pub_lock = Lock()
@@ -125,7 +127,7 @@ class QuadSim(Node):
                 now,
                 timeout=Duration(seconds=timeout))
 
-            self.get_logger().info(f'TF received {trans}')
+            self.get_logger().debug(f'TF received {trans}')
             curr_pos = [trans.transform.translation.x, 
                         trans.transform.translation.y, 
                         trans.transform.translation.z]
@@ -145,11 +147,15 @@ class QuadSim(Node):
 
     def on_tf_init_timer(self):
         res = self.get_tf()
-        if res:
-            self.t, init_pos, init_quat = res
-            init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
-        else:
+        if res is None:
             return
+        
+        self.t, init_pos, init_quat = res
+        try:
+            init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
+        except Exception as exc:
+            self.get_logger().error(f'Something went wrong with the tf {res} generating the exception {exc}')
+            raise
 
         if "init_pose" not in quad_params:
                 quad_params["init_pose"] = np.concatenate((init_pos,init_rpy))
@@ -158,13 +164,6 @@ class QuadSim(Node):
         else:
             self.destroy_timer(self.tf_timer)
             self.start_sim()
-
-    def on_tf_timer(self):
-        res = self.get_tf()
-        if res:
-            if self.sim_pub_lock.acquire(blocking=False):
-                self.res = res
-                self.sim_pub_lock.release()
 
 
     def start_sim(self):   
@@ -205,23 +204,26 @@ class QuadSim(Node):
                           motor_msg.m2,
                           motor_msg.m3,
                           motor_msg.m4]
-        self.get_logger().info(f'Received w_cmd: {self.w_cmd}')
+        self.get_logger().debug(f'Received w_cmd: {self.w_cmd}')
+
 
     def receive_wind_cb(self, wind_msg):
         with self.wind_lock:
             self.wind = [wind_msg.vel_w, 
                          wind_msg.head_w,
                          wind_msg.elev_w]
-        self.get_logger().info(f'Received wind: {self.wind}')
+        self.get_logger().debug(f'Received wind: {self.wind}')
+
 
     def on_sim_loop(self):
         res = self.get_tf()
 
-        if res:
-            new_t, curr_pos, curr_quat = res
-            loops = int((new_t - self.t)/self.Ts)
-        else:
+        if res is None:
             return
+        
+        new_t, curr_pos, curr_quat = res
+        loops = int((new_t - self.t)/self.Ts)
+
 
         if self.wind_lock.acquire(blocking=False):
             self.prev_wind[:] = self.wind[:]
@@ -242,10 +244,11 @@ class QuadSim(Node):
                 self.t += self.Ts
                 self.sim_pub_lock.release()
 
-        self.get_logger().info(f'Quad State: {self.curr_state}')
+        self.get_logger().debug(f'Quad State: {self.curr_state}')
+
 
     def on_sim_publish_pose(self):
-        if not self.t:
+        if self.t is None or (self.curr_state==0.0).all():
             return
         pose_msg = Pose()
         with self.sim_pub_lock:
@@ -259,8 +262,9 @@ class QuadSim(Node):
 
         self.quadpos_pub.publish(pose_msg)
 
+
     def on_sim_publish_fs(self):
-        if not self.t:
+        if self.t is None or (self.curr_state==0.0).all():
             return
         state_msg = QuadState()
         with self.sim_pub_lock:
@@ -277,6 +281,7 @@ class QuadSim(Node):
 
         self.quadstate_pub.publish(state_msg)
         self.get_logger().debug(f'Quad State: {self.curr_state}')
+
 
 def main():
     print("Starting QuadSim...")

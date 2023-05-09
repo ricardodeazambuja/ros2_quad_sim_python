@@ -6,7 +6,7 @@ package_name = 'ros2_quad_sim_python'
 
 setup(
     name=package_name,
-    version='0.0.1',
+    version='0.0.2',
     packages=find_packages(),
     data_files=[
         ('share/ament_index/resource_index/packages', 
@@ -29,6 +29,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': ['quadsim = ros2_quad_sim_python.ros_quad_sim:main',
-                            'quadctrl = ros2_quad_sim_python.ros_quad_ctrl:main'],
+                            'quadctrl = ros2_quad_sim_python.ros_quad_ctrl:main',
+                            'quad = ros2_quad_sim_python.ros_quad_sim_and_ctrl:main'],
     },
 )

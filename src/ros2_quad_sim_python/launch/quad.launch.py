@@ -58,7 +58,7 @@ def generate_launch_description():
         launch_ros.actions.Node(
             package='ros2_quad_sim_python',
             executable='quad',
-            name='quad',
+            name='quadsim',
             output='screen',
             emulate_tty='True',
             on_exit=launch.actions.Shutdown(),

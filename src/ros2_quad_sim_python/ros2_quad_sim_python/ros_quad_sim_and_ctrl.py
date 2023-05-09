@@ -19,7 +19,7 @@ from rclpy_param_helper import Dict2ROS2Params, ROS2Params2Dict
 
 from quad_sim_python import Controller
 
-import ros_quad_sim as rqs
+from . import ros_quad_sim as rqs
 
 ctrl_params = {
             # Position P gains

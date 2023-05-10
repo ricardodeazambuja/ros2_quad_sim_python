@@ -39,6 +39,11 @@ You can launch as many containers as you need. It's easier than using `docker ex
 $ ros2 launch ros2_quad_sim_python launch_everything.launch.py
 ```
 
+The launchfile above exposes just a few parameters. You can verify using:
+```
+$ ros2 launch ros2_quad_sim_python launch_everything.launch.py --show-args
+```
+
 If you still want to use the same container to save some memory, you need to take note of the containers name (it will be `ros2-` plus five random characters). Here is how to check the topics without launching a new container (the container's name in this caase is `ros2-8589d9bd2d`):
 ```
 $ docker exec -t ros2-8589d9bd2d bash -i -c "ros2 topic list"
@@ -55,15 +60,23 @@ If you just want to start a new terminal using the same container (useful when m
 $ docker exec -it ros2-bb93a782c4 bash
 ```
 
-
 These are the commands to launch things individually:
 ```
 $ ros2 launch carla_ros_bridge carla_ros_bridge.launch.py passive:=False town:=Town01
 $ ros2 launch carla_spawn_objects carla_spawn_objects.launch.py objects_definition_file:=src/ros-bridge/carla_spawn_objects/config/flying_sensor.json
-$ ros2 run ros2_quad_sim_python quadsim --ros-args -p init_pose:=[0,0,2,0,0,0]
-$ ros2 run ros2_quad_sim_python quadctrl --ros-args -p Px:=2 -p Py:=2 -p Pz:=1
 $ ros2 run rviz2 rviz2 --ros-args -d ~/carla-ros/install/ros2_quad_sim_python/share/ros2_quad_sim_python/cfg/rviz_flying_sensor.rviz
 ```
+and
+```
+$ ros2 run ros2_quad_sim_python quad --ros-args -p init_pose:=[0,0,2,0,0,0] -p Px:=2 -p Py:=2 -p Pz:=1
+```
+
+or
+```
+$ ros2 run ros2_quad_sim_python quadsim --ros-args -p init_pose:=[0,0,2,0,0,0]
+$ ros2 run ros2_quad_sim_python quadctrl --ros-args -p Px:=2 -p Py:=2 -p Pz:=1
+```
+
 
 Publish a new setpoint by using `$ros2 topic pub /quadctrl/flying_sensor/ctrl_sp quad_sim_python_msgs/msg/QuadControlSetPoint  "h` and hitting the `tab` twice so it will fill the rest of the message. Don't forget to remove the `-` the autocomplete insists adding at the end.   
 Or publish a new twist setpoint by using `ros2 topic pub /quadctrl/flying_sensor/ctrl_twist_sp geometry_msgs/msg/Twist "l` and following the same hints from above.

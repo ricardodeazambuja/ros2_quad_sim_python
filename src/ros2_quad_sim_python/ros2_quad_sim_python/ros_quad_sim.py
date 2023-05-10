@@ -8,7 +8,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from carla_msgs.msg import CarlaStatus
-from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Pose
 from quad_sim_python_msgs.msg import QuadMotors, QuadWind, QuadState
 
@@ -82,6 +81,7 @@ class QuadSim(Node):
 
         # pos[3], quat[4], rpy[3], vel[3], vel_dot[3], omega[3], omega_dot[3]
         self.curr_state = np.zeros(22, dtype='float64')
+        self.curr_state[6] = 1 # the w of a quaternion
 
         self.wind = [0,0,0]
         self.prev_wind = [0,0,0]
@@ -247,7 +247,7 @@ class QuadSim(Node):
 
 
     def on_sim_publish_pose(self):
-        if self.t is None or (self.curr_state==0.0).all():
+        if self.t is None:
             return
         pose_msg = Pose()
         with self.sim_pub_lock:
@@ -263,7 +263,7 @@ class QuadSim(Node):
 
 
     def on_sim_publish_fs(self):
-        if self.t is None or (self.curr_state==0.0).all():
+        if self.t is None:
             return
         state_msg = QuadState()
         with self.sim_pub_lock:

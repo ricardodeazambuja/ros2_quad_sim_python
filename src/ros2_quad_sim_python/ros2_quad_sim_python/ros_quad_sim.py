@@ -151,16 +151,15 @@ class QuadSim(Node):
             return
         
         self.t, init_pos, init_quat = res
-        try:
-            init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
-        except Exception as exc:
-            self.get_logger().error(f'Something went wrong with the tf {res} generating the exception {exc}')
-            raise
-
         if "init_pose" not in quad_params:
-                quad_params["init_pose"] = np.concatenate((init_pos,init_rpy))
-                # Update ROS2 parameters
-                Dict2ROS2Params(self, {"init_pose": quad_params["init_pose"]}) # the controller needs to read some parameters from here
+            try:
+                init_rpy = Rotation.from_quat(init_quat).as_euler('xyz')
+            except Exception as exc:
+                self.get_logger().error(f'Something went wrong with the tf {res} generating the exception {exc}')
+                raise            
+            quad_params["init_pose"] = np.concatenate((init_pos,init_rpy))
+            # Update ROS2 parameters
+            Dict2ROS2Params(self, {"init_pose": quad_params["init_pose"]}) # the controller needs to read some parameters from here
         else:
             self.destroy_timer(self.tf_timer)
             self.start_sim()

@@ -103,6 +103,7 @@ class QuadSimAndCtrl(rqs.QuadSim):
         # the quad state will be directly accessed in this node, 
         # therefore we don't need this timer publishing it
         self.destroy_timer(self.sim_publish_full_state_timer)
+        self.destroy_publisher(self.quadstate_pub)
 
         self.started = False
         self.ctrl_t = None

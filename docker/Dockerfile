@@ -1,4 +1,4 @@
-FROM ricardodeazambuja/ros2-galactic-desktop
+FROM ricardodeazambuja/ros2-galactic-desktop:carla
 
 USER ros2user
 RUN mkdir -p /home/ros2user/carla-ros/src

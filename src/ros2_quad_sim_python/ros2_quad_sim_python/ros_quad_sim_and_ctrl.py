@@ -12,6 +12,7 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.time import Time
 
+from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Twist
 from quad_sim_python_msgs.msg import QuadControlSetPoint
 
@@ -152,6 +153,8 @@ class QuadSimAndCtrl(rqs.QuadSim):
             self.receive_control_twist_cb,
             1)
         
+        self.imu_pub = self.create_publisher(Imu, f'/quadsim/{self.quad_params["target_frame"]}/imu',1)
+
         self.ctrl_loop_timer = self.create_timer(ctrl_params['Tfs'], self.on_ctrl_loop_timer)
 
     def receive_control_sp_cb(self, sp_msg):
@@ -194,6 +197,21 @@ class QuadSimAndCtrl(rqs.QuadSim):
             ctrl_omega = copy(self.curr_state[16:19][:])
             ctrl_omega_dot = copy(self.curr_state[19:22][:])
 
+        imu_msg = Imu()
+        now = Time(nanoseconds=self.t*1E9).to_msg()
+        imu_msg.header.stamp = now
+        imu_msg.header.frame_id = self.quad_params["target_frame"]
+        imu_msg.orientation.x = float(self.curr_state[3])
+        imu_msg.orientation.y = float(self.curr_state[4])
+        imu_msg.orientation.z = float(self.curr_state[5])
+        imu_msg.orientation.w = float(self.curr_state[6])
+        imu_msg.angular_velocity.x = float(self.curr_state[19])
+        imu_msg.angular_velocity.y = float(self.curr_state[20])
+        imu_msg.angular_velocity.z = float(self.curr_state[21])
+        imu_msg.linear_acceleration.x = float(self.curr_state[13])
+        imu_msg.linear_acceleration.x = float(self.curr_state[14])
+        imu_msg.linear_acceleration.x = float(self.curr_state[15])
+        self.imu_pub.publish(imu_msg)
 
         if self.ctrl_sp_lock.acquire(blocking=False):
             if self.curr_sp.yawtype == "twist":

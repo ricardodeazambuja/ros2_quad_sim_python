@@ -31,20 +31,6 @@
                     "noise_lon_bias": 0.0
                 },
                 {
-                    "type": "sensor.other.imu",
-                    "id": "imu",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0.0, "yaw": 0.0},
-                    "noise_accel_stddev_x": 0.0, 
-                    "noise_accel_stddev_y": 0.0, 
-                    "noise_accel_stddev_z": 0.0,
-                    "noise_gyro_stddev_x": 0.0, 
-                    "noise_gyro_stddev_y": 0.0, 
-                    "noise_gyro_stddev_z": 0.0,
-                    "noise_gyro_bias_x": 0.0, 
-                    "noise_gyro_bias_y": 0.0, 
-                    "noise_gyro_bias_z": 0.0
-                },
-                {
                     "type": "sensor.camera.depth",
                     "id": "depth_front",
                     "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0.0, "yaw": 0.0},
@@ -61,49 +47,9 @@
                     "image_size_y": 480
                 },
                 {
-                    "type": "sensor.camera.depth",
-                    "id": "depth_left",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0.0, "yaw": 90.0},
-                    "fov": 73,
-                    "image_size_x": 640,
-                    "image_size_y": 480
-                },
-                {
-                    "type": "sensor.camera.semantic_segmentation",
-                    "id": "semantic_segmentation_left",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0, "yaw": 90.0},
-                    "fov": 73,
-                    "image_size_x": 640,
-                    "image_size_y": 480
-                },
-                {
-                    "type": "sensor.camera.depth",
-                    "id": "depth_right",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0.0, "yaw": -90.0},
-                    "fov": 73,
-                    "image_size_x": 640,
-                    "image_size_y": 480
-                },
-                {
-                    "type": "sensor.camera.semantic_segmentation",
-                    "id": "semantic_segmentation_right",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0, "yaw": -90.0},
-                    "fov": 73,
-                    "image_size_x": 640,
-                    "image_size_y": 480
-                },
-                {
-                    "type": "sensor.camera.depth",
-                    "id": "depth_back",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0.0, "yaw": 180.0},
-                    "fov": 73,
-                    "image_size_x": 640,
-                    "image_size_y": 480
-                },
-                {
-                    "type": "sensor.camera.semantic_segmentation",
-                    "id": "semantic_segmentation_back",
-                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0, "yaw": 180.0},
+                    "type": "sensor.camera.rgb",
+                    "id": "rgb_front",
+                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 0, "yaw": 0.0},
                     "fov": 73,
                     "image_size_x": 640,
                     "image_size_y": 480
@@ -119,6 +65,14 @@
                 {
                     "type": "sensor.camera.semantic_segmentation",
                     "id": "semantic_segmentation_down",
+                    "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 90.0, "yaw": 0.0},
+                    "fov": 73,
+                    "image_size_x": 640,
+                    "image_size_y": 480
+                },
+                {
+                    "type": "sensor.camera.rgb",
+                    "id": "rgb_down",
                     "spawn_point": {"x": 0.0, "y": 0.0, "z": 0.0, "roll": 0.0, "pitch": 90.0, "yaw": 0.0},
                     "fov": 73,
                     "image_size_x": 640,

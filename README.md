@@ -44,7 +44,7 @@ The launchfile above exposes just a few parameters. You can verify using:
 $ ros2 launch ros2_quad_sim_python launch_everything.launch.py --show-args
 ```
 
-If you still want to use the same container to save some memory, you need to take note of the containers name (it will be `ros2-` plus five random characters). Here is how to check the topics without launching a new container (the container's name in this caase is `ros2-8589d9bd2d`):
+If you still want to use the same container to save some memory, you need to take note of the containers name (it will be `ros2-` plus five random characters). Here is how to check the topics without launching a new container (the container's name in this case is `ros2-8589d9bd2d`):
 ```
 $ docker exec -t ros2-8589d9bd2d bash -i -c "ros2 topic list"
 ```

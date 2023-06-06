@@ -44,11 +44,11 @@ The launchfile above exposes just a few parameters. You can verify using:
 $ ros2 launch ros2_quad_sim_python launch_everything.launch.py --show-args
 ```
 
-If you still want to use the same container to save some memory, you need to take note of the containers name (it will be `ros2-` plus five random characters). Here is how to check the topics without launching a new container (the container's name in this case is `ros2-8589d9bd2d`):
+If you still want to use the same container to save some memory, you need to take note of the containers name (it will be `ros2-` plus five random characters). Here is how to check the topics without launching a new container (the container's name in this case is `ros2-bb93a782c4`):
 ```
-$ docker exec -t ros2-8589d9bd2d bash -i -c "ros2 topic list"
+$ docker exec -t ros2-bb93a782c4 bash -i -c "ros2 topic list"
 ```
-Docker exec is a *oneway* thing, so I don't recommend using it with anything that needs to catch the `ctrl+c` (SIGINT) to gracefully stop (like `carla_spawn_objects.launch.py` needs to remove the actors it created from the CARLA server), it will not work.
+Docker exec is an *oneway* thing, so I don't recommend using it with anything that needs to catch the `ctrl+c` (SIGINT) to gracefully stop (like `carla_spawn_objects.launch.py` needs to remove the actors it created from the CARLA server), it will not work.
 
 Another useful command to use (considering your container's name is `ros2-bb93a782c4`) is:
 ```

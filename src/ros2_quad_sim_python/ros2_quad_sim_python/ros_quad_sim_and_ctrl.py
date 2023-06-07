@@ -1,4 +1,5 @@
 import time
+import math
 
 import sys, os
 curr_path = os.getcwd()
@@ -208,9 +209,14 @@ class QuadSimAndCtrl(rqs.QuadSim):
         imu_msg.angular_velocity.x = float(self.curr_state[19])
         imu_msg.angular_velocity.y = float(self.curr_state[20])
         imu_msg.angular_velocity.z = float(self.curr_state[21])
-        imu_msg.linear_acceleration.x = float(self.curr_state[13])
-        imu_msg.linear_acceleration.y = float(self.curr_state[14])
-        imu_msg.linear_acceleration.z = float(self.curr_state[15])
+        phi = self.curr_state[7]
+        theta = self.curr_state[8]
+        gx = -math.sin(theta)*self.quad_params["g"]
+        gy = math.cos(theta)*math.sin(phi)*self.quad_params["g"]
+        gz = math.cos(theta)*math.cos(phi)*self.quad_params["g"]
+        imu_msg.linear_acceleration.x = float(self.curr_state[13])-gx
+        imu_msg.linear_acceleration.y = float(self.curr_state[14])-gy
+        imu_msg.linear_acceleration.z = float(self.curr_state[15])-gz
         self.imu_pub.publish(imu_msg)
 
         if self.ctrl_sp_lock.acquire(blocking=False):

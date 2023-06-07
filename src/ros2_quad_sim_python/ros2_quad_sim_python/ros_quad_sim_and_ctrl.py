@@ -209,8 +209,8 @@ class QuadSimAndCtrl(rqs.QuadSim):
         imu_msg.angular_velocity.y = float(self.curr_state[20])
         imu_msg.angular_velocity.z = float(self.curr_state[21])
         imu_msg.linear_acceleration.x = float(self.curr_state[13])
-        imu_msg.linear_acceleration.x = float(self.curr_state[14])
-        imu_msg.linear_acceleration.x = float(self.curr_state[15])
+        imu_msg.linear_acceleration.y = float(self.curr_state[14])
+        imu_msg.linear_acceleration.z = float(self.curr_state[15])
         self.imu_pub.publish(imu_msg)
 
         if self.ctrl_sp_lock.acquire(blocking=False):

@@ -4,8 +4,8 @@ ROS2 packages to simulate (and control) a quadcopter. These packages were create
 
 # How to use:
 
-## CARLA Simulator
-Start the CARLA simulator in headless mode (https://github.com/ricardodeazambuja/carla-simulator-python):
+## CARLA Simulator Server
+Start the CARLA simulator server in headless mode (https://github.com/ricardodeazambuja/carla-simulator-python):
 ```
 $ docker run --rm -it \
 --name carla-container \
@@ -91,6 +91,20 @@ Now the `quadsim` node is calculating the difference between the machine time an
 
 ## Training Episode Generator
 * [spawn_episode.py](https://github.com/ricardodeazambuja/ros2_quad_sim_python/blob/main/examples/spawn_episode.py): randomly choose a spawn point from the map and populate the area around with vehicles and walkers.
+
+## Modifying the weather inside CARLA
+Below is an example of how to modify the weather:
+```
+$ ros2 topic pub /carla/weather_control carla_msgs/msg/CarlaWeatherParameters "cloudiness: 30.0 
+precipitation: 0.0
+precipitation_deposits: 0.0
+wind_intensity: 0.0
+fog_density: 0.0
+fog_distance: 0.0
+wetness: 0.0
+sun_azimuth_angle: 15.0
+sun_altitude_angle: 15.0" --once
+```
 
 
 ## Making changes

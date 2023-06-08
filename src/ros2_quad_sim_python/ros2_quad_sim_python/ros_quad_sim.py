@@ -9,6 +9,7 @@ from scipy.spatial.transform import Rotation
 
 from carla_msgs.msg import CarlaStatus
 from geometry_msgs.msg import Pose
+from sensor_msgs.msg import Imu
 from quad_sim_python_msgs.msg import QuadMotors, QuadWind, QuadState
 
 import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
@@ -87,15 +88,15 @@ class QuadSim(Node):
         self.prev_wind = [0,0,0]
 
 
-        self.get_carlastatus = self.create_subscription(
-            CarlaStatus,
-            '/carla/status',
-            self.get_carlastatus_cb,
+        self.check_flying_sensor_alive = self.create_subscription(
+            Imu,
+            '/carla/flying_sensor',
+            self.check_flying_sensor_alive_cb,
             1)
 
         
-    def get_carlastatus_cb(self, msg):
-        self.destroy_subscription(self.get_carlastatus) # we don't need this subscriber anymore...
+    def check_flying_sensor_alive_cb(self, msg):
+        self.destroy_subscription(self.check_flying_sensor_alive) # we don't need this subscriber anymore...
 
         # Read ROS2 parameters the user may have set 
         # E.g. (https://docs.ros.org/en/foxy/How-To-Guides/Node-arguments.html):

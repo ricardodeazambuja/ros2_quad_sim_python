@@ -1,102 +1,69 @@
-import launch
-import launch_ros.actions
-
-#TODO: add all the parameters here...
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument, Shutdown
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
-    ld = launch.LaunchDescription([
-        launch.actions.DeclareLaunchArgument(
-            name='init_pose',
-            default_value="[0,0,2,0,0,0]",
-            description='Initial pose'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='target_frame',
-            default_value='flying_sensor',
-            description='Target frame for the flying sensor'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='map_frame',
-            default_value='map',
-            description='Target frame for the flying sensor'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='Px',
-            default_value='5.0',
-            description='Position P gain for x'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='Py',
-            default_value='5.0',
-            description='Position P gain for y'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='Pz',
-            default_value='2.0',
-            description='Position P gain for z'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='Pxdot',
-            default_value='5.0',
-            description='Velocity P gain for X'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='Pydot',
-            default_value='5.0',
-            description='Velocity P gain for Y'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='Pzdot',
-            default_value='2.0',
-            description='Velocity P gain for Z'
-        ),
-        launch.actions.DeclareLaunchArgument(
-            name='tiltMax',
-            default_value='30.0',
-            description='Max tilt [degrees]'
-        ),
-        launch_ros.actions.Node(
+    quad_params = {
+            'target_frame': ('flying_sensor','Target frame for the flying sensor'), 
+            'map_frame': ('map','Map frame for the flying sensor'), 
+            'init_pose': ('[0,0,2,0,0,0]','Initial pose'),
+            # Position P gains
+            'Px': ('5.0','Position Px gain'),
+            'Py': ('5.0','Position Py gain'),
+            'Pz': ('2.0','Position Pz gain'),
+            # Velocity PID gains
+            "Pxdot" : ('5.0','Velocity P x gains'),
+            "Dxdot" : ('0.5','Velocity D x gains'),
+            "Ixdot" : ('5.0','Velocity I x gains'),
+            "Pydot" : ('5.0','Velocity P y gains'),
+            "Dydot" : ('0.5','Velocity D y gains'),
+            "Iydot" : ('5.0','Velocity I y gains'),
+            "Pzdot" : ('4.0','Velocity P z gains'),
+            "Dzdot" : ('0.5','Velocity D z gains'),
+            "Izdot" : ('5.0','Velocity I z gains'),
+            # Attitude P gains
+            "Pphi"   : ('4.0','Attitude P phi gain'),
+            "Ptheta" : ('4.0','Attitude P theta gain'),
+            "Ppsi"   : ('1.5','Attitude P psi gain'),
+            # Rate P-D gains
+            "Pp" : ('1.5',''),
+            "Dp" : ('0.04',''),
+            "Pq" : ('1.5',''),
+            "Dq" : ('0.04',''),
+            "Pr" : ('1.0',''),
+            "Dr" : ('0.1',''),
+            # Max Velocities (x,y,z) [m/s]
+            "uMax" : ('50.0','Max velocity x'),
+            "vMax" : ('50.0','Max velocity y'),
+            "wMax" : ('50.0','Max velocity z'),
+            "saturateVel_separately" : ('True', ''),
+            # Max tilt [degrees]
+            'tiltMax': ('30.0', ''),
+            # Max Rate [rad/s]
+            "pMax" : ('200.0',''),
+            "qMax" : ('200.0',''),
+            "rMax" : ('150.0',''),
+            # Minimum velocity for yaw follow to kick in [m/s]
+            "minTotalVel_YawFollow" : ('0.1', ''),
+            # Include integral gains in linear velocity control
+            "useIntegral" : ('True', ''),
+            }
+
+    quad_params_arg = [DeclareLaunchArgument(k, default_value=v[0], description=v[1]) for k,v in quad_params.items()]
+    quad_params_lcgf = {k: LaunchConfiguration(k) for k in quad_params.keys()}
+    return LaunchDescription([
+        *quad_params_arg,
+        Node(
             package='ros2_quad_sim_python',
             executable='quad',
             name='quadsim',
             output='screen',
             emulate_tty='True',
-            on_exit=launch.actions.Shutdown(),
-            parameters=[
-                {
-                    'init_pose': launch.substitutions.LaunchConfiguration('init_pose')
-                },
-                {
-                    'target_frame': launch.substitutions.LaunchConfiguration('target_frame')
-                },
-                {
-                    'map_frame': launch.substitutions.LaunchConfiguration('map_frame')
-                },
-                {
-                    'Px': launch.substitutions.LaunchConfiguration('Px')
-                },
-                {
-                    'Py': launch.substitutions.LaunchConfiguration('Py')
-                },
-                {
-                    'Pz': launch.substitutions.LaunchConfiguration('Pz')
-                },
-                {
-                    'Pxdot': launch.substitutions.LaunchConfiguration('Pxdot')
-                },
-                {
-                    'Pydot': launch.substitutions.LaunchConfiguration('Pydot')
-                },
-                {
-                    'Pzdot': launch.substitutions.LaunchConfiguration('Pzdot')
-                },
-                {
-                    'tiltMax': launch.substitutions.LaunchConfiguration('tiltMax')
-                },
-            ]
+            on_exit=Shutdown(),
+            parameters=[{k:v} for k,v in quad_params_lcgf.items()]
         )
     ])
-    return ld
 
 
 if __name__ == '__main__':

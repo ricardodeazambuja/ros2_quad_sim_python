@@ -18,7 +18,7 @@ def generate_launch_description():
         launch.actions.DeclareLaunchArgument(
             name='map_frame',
             default_value='map',
-            description='Target frame for the flying sensor'
+            description='Map frame for the flying sensor'
         ),
         launch_ros.actions.Node(
             package='ros2_quad_sim_python',

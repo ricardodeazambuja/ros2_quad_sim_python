@@ -111,7 +111,6 @@ sun_altitude_angle: 15.0" --once
 Don't forget to run `colcon build --symlink-install` if you change anything that is not just a Python script.
 
 # TODO
-* Add all the parameters to the launch files.
 * Add an example publishing setpoints to quadctrl, reading the current state, etc.
 * Add an example using the wind.
 * Create a message for the potential field and update ros_quad_ctrl to subscribe to a topic receiving that message.

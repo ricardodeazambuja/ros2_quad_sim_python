@@ -36,13 +36,46 @@ def generate_launch_description():
          'target_frame': 'flying_sensor', 
          'map_frame': 'map', 
          'init_pose': '[0,0,2,0,0,0]',
+         # Position P gains
          'Px': '5.0',
          'Py': '5.0',
          'Pz': '2.0',
-         'Pxdot': '5.0',
-         'Pydot': '5.0',
-         'Pzdot': '2.0',
+         # Velocity PID gains
+         "Pxdot" : '5.0',
+         "Dxdot" : '0.5',
+         "Ixdot" : '5.0',
+         "Pydot" : '5.0',
+         "Dydot" : '0.5',
+         "Iydot" : '5.0',
+         "Pzdot" : '4.0',
+         "Dzdot" : '0.5',
+         "Izdot" : '5.0',
+         # Attitude P gains
+         "Pphi"   : '4.0',
+         "Ptheta" : '4.0',
+         "Ppsi"   : '1.5',
+         # Rate P-D gains
+         "Pp" : '1.5',
+         "Dp" : '0.04',
+         "Pq" : '1.5',
+         "Dq" : '0.04',
+         "Pr" : '1.0',
+         "Dr" : '0.1',
+         # Max Velocities (x,y,z) [m/s]
+         "uMax" : '50.0',
+         "vMax" : '50.0',
+         "wMax" : '50.0',
+         "saturateVel_separately" : 'True',
+         # Max tilt [degrees]
          'tiltMax': '30.0',
+         # Max Rate [rad/s]
+         "pMax" : '200.0',
+         "qMax" : '200.0',
+         "rMax" : '150.0',
+         # Minimum velocity for yaw follow to kick in [m/s]
+         "minTotalVel_YawFollow" : '0.1',
+         # Include integral gains in linear velocity control
+         "useIntegral" : 'True',
          }
    quad_params_lcgf = {k: LaunchConfiguration(k) for k in quad_params.keys()}
    quad_params_arg = [DeclareLaunchArgument(k, default_value=v) for k,v in quad_params.items()]

@@ -1,3 +1,5 @@
+import math
+
 import rclpy # https://docs.ros2.org/latest/api/rclpy/api/node.html
 from rclpy.node import Node
 
@@ -18,7 +20,7 @@ class SpawnActorServer(Node):
         self.spawned_actors = {}
         actors2spawn = input('Input the actors to spawn separated by \';\':')
         self.actors2spawn = actors2spawn.replace(" ", "").split(';')
-        actorspose = input('Input the actor poses (x,y,z) separated by \';\':')
+        actorspose = input('Input the actor position+yaw (x,y,z,yaw) separated by \';\':')
         self.actorspose = [eval(i) for i in actorspose.split(';')]
 
         if len(self.actors2spawn)>0 and len(self.actors2spawn)==len(self.actorspose):
@@ -27,6 +29,8 @@ class SpawnActorServer(Node):
                 posemsg.position.x = float(pose[0])
                 posemsg.position.y = float(pose[1])
                 posemsg.position.z = float(pose[2])
+                posemsg.orientation.w = float(math.cos(math.pi*pose[3]*0.5/180))
+                posemsg.orientation.z = float(math.sin(math.pi*pose[3]*0.5/180))
                 res_id = self.spawn_actor(actor, f"{actor.split('.')[0]}_{i:03d}", posemsg)
                 if res_id != -1:
                     self.spawned_actors[res_id] = pose

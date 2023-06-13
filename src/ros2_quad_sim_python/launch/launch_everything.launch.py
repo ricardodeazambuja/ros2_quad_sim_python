@@ -35,7 +35,7 @@ def generate_launch_description():
    quad_params = {
          'target_frame': ('flying_sensor','Target frame for the flying sensor'), 
          'map_frame': ('map','Map frame for the flying sensor'), 
-         'init_pose': ('[0,0,2,0,0,0]','Initial pose'),
+         'init_pose': ('[0,0,100,0,0,0]','Initial pose'),
          # Position P gains
          'Px': ('5.0','Position Px gain'),
          'Py': ('5.0','Position Py gain'),

@@ -10,6 +10,11 @@ from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
+   host = LaunchConfiguration('host')
+   host_launch_arg = DeclareLaunchArgument(
+      'host',
+      default_value='carla-container.local'
+   )
    town = LaunchConfiguration('town')
    town_launch_arg = DeclareLaunchArgument(
       'town',
@@ -19,7 +24,7 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('carla_ros_bridge'), 'carla_ros_bridge.launch.py')]
       ),
-      launch_arguments={'town': town}.items(),
+      launch_arguments={'town': town, 'host': host}.items(),
       )
    objects_definition_file = LaunchConfiguration('objects_definition_file')
    objects_definition_file_arg = DeclareLaunchArgument(
@@ -86,6 +91,7 @@ def generate_launch_description():
       )
 
    return LaunchDescription([
+      host_launch_arg,
       town_launch_arg,
       carla_bridge,
       objects_definition_file_arg,

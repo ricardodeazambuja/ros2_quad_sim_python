@@ -177,12 +177,6 @@ class QuadSim(Node):
         new_params = {key: self.quad.params[key] for key in self.quad.params if key not in params}
         Dict2ROS2Params(self, new_params) # some parameters are created by the quad object
 
-        self.sim_loop_timer = self.create_timer(self.Ts, self.on_sim_loop)
-        self.sim_publish_full_state_timer = self.create_timer(params['Tfs'], self.on_sim_publish_fs)
-        self.sim_publish_pose_timer = self.create_timer(params['Tp'], self.on_sim_publish_pose)
-
-        self.get_logger().info(f'Simulator started!')
-
         self.quadpos_pub = self.create_publisher(Pose, f'/carla/{quad_params["target_frame"]}/control/set_transform',1)
         self.quadstate_pub = self.create_publisher(QuadState, f'/quadsim/{quad_params["target_frame"]}/state',1)
 
@@ -197,6 +191,13 @@ class QuadSim(Node):
             f'/quadsim/{quad_params["target_frame"]}/wind',
             self.receive_wind_cb,
             1)
+
+        self.sim_loop_timer = self.create_timer(self.Ts, self.on_sim_loop)
+        self.sim_publish_full_state_timer = self.create_timer(params['Tfs'], self.on_sim_publish_fs)
+        self.sim_publish_pose_timer = self.create_timer(params['Tp'], self.on_sim_publish_pose)
+
+        self.get_logger().info(f'Simulator started!')
+
 
     def receive_w_cmd_cb(self, motor_msg):
         with self.w_cmd_lock:

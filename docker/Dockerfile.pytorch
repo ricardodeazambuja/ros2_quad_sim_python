@@ -3,7 +3,6 @@ FROM ricardodeazambuja/ros2_quad_sim_python
 RUN sudo apt-get update && \
     sudo apt-get install -y imagemagick && \
     sudo rm -rf /var/lib/apt/lists/* && \
-    sudo -H pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 --extra-index-url https://download.pytorch.org/whl/cu117 && \
     sudo -H pip install transformers && \
     sudo -H pip cache remove "*" && \
     python3 -c 'from transformers import CLIPSegProcessor, CLIPSegForImageSegmentation; \
